@@ -1,6 +1,5 @@
 /* heroe.js — mi día en 3D, hecho solo con código (Three.js).
    Me despierto → me siento en la PC de $12K → saco clips → los subo → registro cobros y pagos. 24 s en bucle. */
-const quieto = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const fmt = n => Math.round(n).toLocaleString("en-US");
 const LIMA = "#c6f432", CORAL = "#ff5a4e", ORO = "#ffd166", AZUL = "#1877f2", TT = "#fe2c55";
 const MONO = "JetBrains Mono, monospace", SANS = "Inter, sans-serif", TIT = "Space Grotesk, sans-serif";
@@ -195,13 +194,13 @@ function hud(t) {
    RELOJ: atado al reloj real, así nunca se queda pegado aunque el equipo sea lento
    ============================================================ */
 const fijo = new URLSearchParams(location.search).get("t");   // ?t=12 congela el video en ese segundo
-const congelado = fijo !== null || quieto;
-let reloj = fijo !== null ? +fijo : quieto ? 23.2 : 0, antes = performance.now(), visible = true, dtF = 0;
+const congelado = fijo !== null;
+let reloj = fijo !== null ? +fijo : 0, antes = performance.now(), visible = true, dtF = 0;
 new IntersectionObserver(es => { visible = es[0].isIntersecting; }, { threshold: 0 }).observe(caja);
-let pintar = () => {}, listo = false;
+let pintar = () => {}, listo = false, modo = null;
 function cuadro(ahora) {
   requestAnimationFrame(cuadro);
-  const dt = Math.min(.25, Math.max(0, (ahora - antes) / 1000)); antes = ahora;
+  const dt = Math.min(1, Math.max(0, (ahora - antes) / 1000)); antes = ahora;
   if (!visible || document.hidden || !listo) return;
   dtF = dt;
   const previo = reloj % T;
@@ -215,6 +214,9 @@ function cuadro(ahora) {
 
 /* si el navegador no tiene WebGL: se muestra solo la pantalla */
 function modo2D() {
+  if (modo === "2d") return;
+  modo = "2d";
+  caja.querySelectorAll("canvas").forEach(x => x.remove());
   caja.prepend(pantalla);
   pintar = t => dibujarPantalla(Math.max(t, 6.8));
   listo = true;
@@ -236,12 +238,12 @@ async function iniciar3D() {
   await Promise.race([document.fonts ? document.fonts.ready : null, new Promise(r => setTimeout(r, 1500))]);
 
   const movil = matchMedia("(max-width: 900px)").matches;
-  const pr = Math.min(devicePixelRatio || 1, movil ? 1.5 : 2);
+  let pr = Math.min(devicePixelRatio || 1, movil ? 1.25 : 2);
   const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
   renderer.setPixelRatio(pr);
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1;
-  caja.prepend(renderer.domElement);
+  renderer.domElement.addEventListener("webglcontextlost", e => { e.preventDefault(); console.warn("Se perdió el contexto WebGL; se muestra en 2D"); modo2D(); });
 
   const escena = new THREE.Scene();
   escena.background = new THREE.Color("#06070a");
@@ -249,7 +251,7 @@ async function iniciar3D() {
   escena.environment = pm.fromScene(new RoomEnvironment(renderer), .04).texture;
   const cam = new THREE.PerspectiveCamera(40, 1.6, .05, 40);
 
-  const rt = new THREE.WebGLRenderTarget(2, 2, { type: THREE.HalfFloatType, samples: movil ? 2 : 4 });
+  const rt = new THREE.WebGLRenderTarget(2, 2, { type: THREE.HalfFloatType, samples: movil ? 0 : 4 });
   const composer = new EffectComposer(renderer, rt);
   composer.setPixelRatio(pr);
   composer.addPass(new RenderPass(escena, cam));
@@ -645,7 +647,7 @@ async function iniciar3D() {
   const cLuna = new THREE.Color("#7d93ff"), cAlba = new THREE.Color("#ffa25c"), cDia = new THREE.Color("#fff0dc"), tmp = new THREE.Color();
 
   let n = 0;
-  pintar = t => {
+  const pintar3D = t => {
     n++;
     const l = luzDia(t), prog = progresoSol(t), ang = prog * Math.PI;
     // sol (o luna) entrando por la ventana
@@ -693,11 +695,36 @@ async function iniciar3D() {
     // vapor del café
     vapor.forEach((v, i) => { const o = (t * .45 + i / 3) % 1; v.visible = t > 6.5 && t < 17.5; v.position.set(1.22 + Math.sin(o * 6 + i) * .015, .9 + o * .2, -1.62); v.scale.setScalar(.04 + o * .07); v.material.opacity = Math.sin(o * Math.PI) * .5; });
     camara(t);
-    composer.render();
+    const t0 = performance.now();
+    if (conBloom) composer.render(); else renderer.render(escena, cam);
+    vigilar(performance.now() - t0, dtF);
   };
+  // si el equipo va lento, baja la calidad sola (nunca se queda pegado)
+  let conBloom = true, nivel = movil ? 1 : 2, muestras = [];
+  function vigilar(costo, dt) {
+    muestras.push(Math.max(costo, dt * 1000));
+    if (muestras.length < 45) return;
+    const prom = muestras.sort((a, b) => a - b)[Math.floor(muestras.length / 2)]; muestras = [];
+    if (prom < 38 || nivel <= -1) return;
+    nivel--;
+    if (nivel === 1) pr = 1;
+    else if (nivel === 0) { conBloom = false; pr = Math.min(pr, .85); }
+    else { pr = .6; renderer.shadowMap.enabled = false; escena.traverse(o => { if (o.material) o.material.needsUpdate = true; }); }
+    renderer.setPixelRatio(pr); composer.setPixelRatio(pr); medir();
+    console.info("Calidad del 3D bajada a", nivel);
+  }
+  if (modo === "2d") return;
+  // compila todo antes de mostrar (así no se traba la primera vez que aparece algo)
+  escena.traverse(o => { o.visible = true; });
+  renderer.compile(escena, cam);
+  modo = "3d";
+  pintar = pintar3D;
+  caja.prepend(renderer.domElement);
   listo = true;
 }
 
 hud(reloj % T);
+negro.style.opacity = 1; negroTxt.textContent = "CARGANDO…"; negroTxt.style.opacity = .5;
 requestAnimationFrame(cuadro);
+setTimeout(() => { if (!listo) { console.warn("El 3D tardó demasiado; se muestra en 2D"); modo2D(); } }, 12000);
 iniciar3D().catch(e => { console.warn("3D no disponible:", e); modo2D(); });
