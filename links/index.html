@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>THZ · Links</title>
+<meta name="description" content="Clips de streams, realities y gaming. Todas mis páginas en un solo lugar.">
+<meta name="theme-color" content="#0a0b0d">
+<link rel="icon" href="img/thz_clips.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0b0d; --bg2:#111317; --line:#1d2026; --txt:#eef0f3; --mut:#8a909b;
+  --lima:#c6f432; --coral:#ff5a4e; --oro:#ffd166;
+  --r:18px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--txt);font:16px/1.5 Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+.envoltura{max-width:1120px;margin:0 auto;padding:0 20px}
+
+/* ---------- héroe ---------- */
+.heroe{position:relative;min-height:100svh;display:grid;align-items:center;overflow:hidden}
+#lienzo{position:absolute;inset:0;width:100%;height:100%;display:block}
+.heroe::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse 70% 60% at 30% 40%,transparent 40%,var(--bg) 100%)}
+.heroe .envoltura{position:relative;z-index:2;width:100%;padding-top:72px;padding-bottom:72px}
+.etiqueta{display:inline-flex;align-items:center;gap:8px;font:600 12px/1 "JetBrains Mono",monospace;letter-spacing:.12em;
+  color:var(--lima);border:1px solid #2a3410;background:#c6f4320d;padding:8px 12px;border-radius:99px}
+.etiqueta i{width:7px;height:7px;border-radius:50%;background:var(--coral);box-shadow:0 0 0 0 var(--coral);animation:latido 1.6s infinite}
+@keyframes latido{70%{box-shadow:0 0 0 8px #ff5a4e00}100%{box-shadow:0 0 0 0 #ff5a4e00}}
+h1{font:700 clamp(44px,8.4vw,104px)/.92 "Space Grotesk",sans-serif;letter-spacing:-.04em;margin:22px 0 18px;max-width:9.5em}
+h1 .lin{display:block;overflow:hidden}
+h1 .lin span{display:inline-block;transform:translateY(105%);animation:sube .9s cubic-bezier(.2,.8,.2,1) forwards}
+h1 .lin:nth-child(2) span{animation-delay:.12s}
+h1 .lin:nth-child(3) span{animation-delay:.24s}
+@keyframes sube{to{transform:none}}
+h1 .acento{color:var(--lima)}
+h1 .oro{background:linear-gradient(90deg,var(--oro),#fff3c4,var(--oro));background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:brillo 4s linear infinite,sube .9s .24s cubic-bezier(.2,.8,.2,1) forwards}
+@keyframes brillo{to{background-position:-200% 0}}
+.bajada{color:var(--mut);max-width:30em;font-size:clamp(16px,2vw,19px);opacity:0;animation:aparece .8s .5s forwards}
+@keyframes aparece{to{opacity:1}}
+.contador{margin-top:34px;display:inline-flex;flex-direction:column;gap:2px;padding:16px 20px;border:1px solid var(--line);border-radius:var(--r);
+  background:#0d0f12cc;backdrop-filter:blur(8px);opacity:0;animation:aparece .8s .7s forwards}
+.contador small{font:600 11px/1 "JetBrains Mono",monospace;letter-spacing:.14em;color:var(--mut)}
+.contador b{font:700 clamp(30px,5vw,44px)/1.1 "Space Grotesk",sans-serif;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.contador b em{font-style:normal;color:var(--lima)}
+.bajar{position:absolute;left:50%;bottom:22px;z-index:2;transform:translateX(-50%);color:var(--mut);font:500 12px "JetBrains Mono",monospace;letter-spacing:.12em;display:flex;flex-direction:column;align-items:center;gap:8px}
+.bajar span{width:1px;height:34px;background:linear-gradient(var(--lima),transparent);animation:goteo 1.8s infinite}
+@keyframes goteo{0%{transform:scaleY(0);transform-origin:top}50%{transform:scaleY(1);transform-origin:top}51%{transform-origin:bottom}100%{transform:scaleY(0);transform-origin:bottom}}
+
+/* ---------- cinta ---------- */
+.cinta{border-block:1px solid var(--line);overflow:hidden;white-space:nowrap;padding:14px 0;background:var(--bg2)}
+.cinta div{display:inline-block;animation:corre 26s linear infinite;font:700 clamp(18px,3vw,26px)/1 "Space Grotesk",sans-serif;letter-spacing:-.01em}
+.cinta div span{margin:0 18px;color:var(--mut)}
+.cinta div span.v{color:var(--txt)}
+.cinta div span.x{color:var(--coral)}
+@keyframes corre{to{transform:translateX(-50%)}}
+
+/* ---------- links ---------- */
+section{padding:96px 0}
+.titulo{display:flex;align-items:end;justify-content:space-between;gap:16px;margin-bottom:28px;flex-wrap:wrap}
+h2{font:700 clamp(30px,4.6vw,52px)/1 "Space Grotesk",sans-serif;letter-spacing:-.03em}
+.titulo p{color:var(--mut);max-width:24em}
+.links{display:grid;gap:14px}
+.link{--a:0deg;position:relative;display:grid;grid-template-columns:64px 1fr auto;align-items:center;gap:18px;padding:16px 20px 16px 16px;
+  border-radius:var(--r);background:var(--bg2);border:1px solid var(--line);isolation:isolate;
+  transition:transform .35s cubic-bezier(.2,.8,.2,1),border-color .35s;opacity:0;transform:translateY(24px)}
+.link.visto{opacity:1;transform:none;transition:opacity .7s,transform .7s cubic-bezier(.2,.8,.2,1),border-color .35s}
+.link::before{content:"";position:absolute;inset:-1px;border-radius:inherit;padding:1px;z-index:-1;opacity:0;transition:opacity .35s;
+  background:conic-gradient(from var(--a),var(--lima),transparent 30%,var(--coral) 55%,transparent 80%,var(--lima));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:gira 3s linear infinite}
+@property --a{syntax:"<angle>";inherits:false;initial-value:0deg}
+@keyframes gira{to{--a:360deg}}
+.link:hover,.link:focus-visible{transform:translateY(-3px);border-color:transparent;outline:none}
+.link:hover::before,.link:focus-visible::before{opacity:1}
+.link img{width:64px;height:64px;border-radius:14px;object-fit:cover}
+.link h3{font:700 20px/1.15 "Space Grotesk",sans-serif;letter-spacing:-.01em}
+.link p{color:var(--mut);font-size:14px;margin-top:3px}
+.red{display:inline-flex;align-items:center;gap:6px;font:600 11px/1 "JetBrains Mono",monospace;letter-spacing:.1em;color:var(--mut);margin-top:8px}
+.red svg{width:13px;height:13px;fill:#1877f2}
+.flecha{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line);transition:.35s}
+.flecha svg{width:16px;height:16px;stroke:var(--txt);fill:none;stroke-width:2;transition:transform .35s}
+.link:hover .flecha{background:var(--lima);border-color:var(--lima)}
+.link:hover .flecha svg{stroke:#0a0b0d;transform:rotate(-45deg)}
+
+/* ---------- terminal ---------- */
+.dos{display:grid;grid-template-columns:1.15fr .85fr;gap:20px}
+.terminal{border:1px solid var(--line);border-radius:var(--r);background:#08090b;overflow:hidden;min-height:340px;display:flex;flex-direction:column}
+.terminal .barra{display:flex;gap:7px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line);background:var(--bg2)}
+.terminal .barra i{width:11px;height:11px;border-radius:50%;background:#2a2e35}
+.terminal .barra i:first-child{background:var(--coral)}
+.terminal .barra span{margin-left:auto;font:500 12px "JetBrains Mono",monospace;color:var(--mut)}
+#codigo{flex:1;padding:18px;font:400 clamp(12.5px,1.5vw,14px)/1.75 "JetBrains Mono",monospace;white-space:pre-wrap;color:#c9ced6}
+#codigo .k{color:var(--coral)} #codigo .f{color:var(--lima)} #codigo .s{color:var(--oro)} #codigo .c{color:#5b616b} #codigo .n{color:#7cc7ff}
+#codigo .cursor{display:inline-block;width:8px;height:1.1em;vertical-align:-3px;background:var(--lima);animation:parpadea 1s steps(1) infinite}
+@keyframes parpadea{50%{opacity:0}}
+.tarjeta{border:1px solid var(--line);border-radius:var(--r);background:var(--bg2);padding:22px;display:flex;flex-direction:column;gap:14px;overflow:hidden}
+.tarjeta small{font:600 11px/1 "JetBrains Mono",monospace;letter-spacing:.14em;color:var(--mut)}
+.tarjeta .grande{font:700 clamp(34px,4.4vw,48px)/1 "Space Grotesk",sans-serif;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.tarjeta .grande em{font-style:normal;color:var(--lima);font-size:.55em;margin-left:6px;vertical-align:middle}
+#grafica{width:100%;height:170px;display:block;margin-top:auto}
+
+/* ---------- pie ---------- */
+footer{border-top:1px solid var(--line);padding:34px 0 46px;color:var(--mut);font-size:14px}
+footer .envoltura{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+footer b{color:var(--txt);font-family:"Space Grotesk",sans-serif}
+
+@media (max-width:820px){
+  .dos{grid-template-columns:1fr}
+  section{padding:72px 0}
+  .link{grid-template-columns:52px 1fr auto;gap:14px}
+  .link img{width:52px;height:52px;border-radius:12px}
+  .flecha{width:36px;height:36px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before{animation-duration:.001s!important;animation-iteration-count:1!important;transition:none!important}
+  .link{opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+
+<header class="heroe">
+  <canvas id="lienzo" aria-hidden="true"></canvas>
+  <div class="envoltura">
+    <span class="etiqueta"><i></i>EN VIVO · CORTANDO CLIPS</span>
+    <h1>
+      <span class="lin"><span>Corto.</span></span>
+      <span class="lin"><span class="acento">Subo.</span></span>
+      <span class="lin"><span class="oro">Cobro.</span></span>
+    </h1>
+    <p class="bajada">Los mejores momentos de streams, realities y gaming, convertidos en clips. Todas mis páginas, aquí.</p>
+    <div class="contador" aria-live="off">
+      <small>GANANCIAS DE LOS CLIPS</small>
+      <b><em>$</em><span id="dinero">0</span></b>
+    </div>
+  </div>
+  <a class="bajar" href="#paginas">MIS PÁGINAS<span></span></a>
+</header>
+
+<div class="cinta" aria-hidden="true"><div>
+  <span class="v">CORTAR</span><span class="x">✂</span><span>SUBIR</span><span class="x">✂</span><span class="v">COBRAR</span><span class="x">✂</span><span>REPETIR</span><span class="x">✂</span>
+  <span class="v">CORTAR</span><span class="x">✂</span><span>SUBIR</span><span class="x">✂</span><span class="v">COBRAR</span><span class="x">✂</span><span>REPETIR</span><span class="x">✂</span>
+  <span class="v">CORTAR</span><span class="x">✂</span><span>SUBIR</span><span class="x">✂</span><span class="v">COBRAR</span><span class="x">✂</span><span>REPETIR</span><span class="x">✂</span>
+  <span class="v">CORTAR</span><span class="x">✂</span><span>SUBIR</span><span class="x">✂</span><span class="v">COBRAR</span><span class="x">✂</span><span>REPETIR</span><span class="x">✂</span>
+</div></div>
+
+<main>
+  <section id="paginas">
+    <div class="envoltura">
+      <div class="titulo">
+        <h2>Mis páginas</h2>
+        <p>Sígueme donde más te guste. Clips nuevos todos los días.</p>
+      </div>
+      <div class="links">
+        <a class="link" href="https://www.facebook.com/1512252991960357" target="_blank" rel="noopener">
+          <img src="img/stream_clips.jpg" alt="" width="64" height="64">
+          <div><h3>Stream clips</h3><p>Lo más fuerte de los streams y realities en vivo.</p>
+            <span class="red"><svg viewBox="0 0 24 24"><path d="M24 12a12 12 0 1 0-13.9 11.9v-8.4H7.1V12h3V9.4c0-3 1.8-4.7 4.5-4.7 1.3 0 2.7.2 2.7.2v3h-1.5c-1.5 0-2 .9-2 1.9V12h3.4l-.5 3.5h-2.9v8.4A12 12 0 0 0 24 12z"/></svg>FACEBOOK</span></div>
+          <span class="flecha"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+        </a>
+        <a class="link" href="https://www.facebook.com/1471587699371731" target="_blank" rel="noopener">
+          <img src="img/thz_clips.jpg" alt="" width="64" height="64">
+          <div><h3>THZ CLIPS</h3><p>Momentos virales, peleas y lo que nadie se esperaba.</p>
+            <span class="red"><svg viewBox="0 0 24 24"><path d="M24 12a12 12 0 1 0-13.9 11.9v-8.4H7.1V12h3V9.4c0-3 1.8-4.7 4.5-4.7 1.3 0 2.7.2 2.7.2v3h-1.5c-1.5 0-2 .9-2 1.9V12h3.4l-.5 3.5h-2.9v8.4A12 12 0 0 0 24 12z"/></svg>FACEBOOK</span></div>
+          <span class="flecha"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+        </a>
+        <a class="link" href="https://www.facebook.com/1580711738451451" target="_blank" rel="noopener">
+          <img src="img/thz_gaming.jpg" alt="" width="64" height="64">
+          <div><h3>THZ Gaming CLIPS</h3><p>Las mejores jugadas y momentos de gaming.</p>
+            <span class="red"><svg viewBox="0 0 24 24"><path d="M24 12a12 12 0 1 0-13.9 11.9v-8.4H7.1V12h3V9.4c0-3 1.8-4.7 4.5-4.7 1.3 0 2.7.2 2.7.2v3h-1.5c-1.5 0-2 .9-2 1.9V12h3.4l-.5 3.5h-2.9v8.4A12 12 0 0 0 24 12z"/></svg>FACEBOOK</span></div>
+          <span class="flecha"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding-top:0">
+    <div class="envoltura">
+      <div class="titulo">
+        <h2>Cómo se hace</h2>
+        <p>Del vivo al clip, del clip a la página, de la página a la cuenta.</p>
+      </div>
+      <div class="dos">
+        <div class="terminal">
+          <div class="barra"><i></i><i></i><i></i><span>clipper.py</span></div>
+          <div id="codigo"></div>
+        </div>
+        <div class="tarjeta">
+          <small>VISTAS ESTE MES</small>
+          <div class="grande"><span id="vistas">0</span><em>▲</em></div>
+          <canvas id="grafica" aria-hidden="true"></canvas>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer><div class="envoltura"><span><b>THZ</b> · clips todos los días</span><span>© 2026</span></div></footer>
+
+<script>
+(() => {
+const quieto = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const fmt = n => Math.floor(n).toLocaleString("en-US");
+const LIMA = "#c6f432", CORAL = "#ff5a4e", ORO = "#ffd166";
+
+/* ================= HÉROE: la línea de tiempo que se corta en clips ================= */
+const cv = document.getElementById("lienzo"), cx = cv.getContext("2d");
+const dineroEl = document.getElementById("dinero");
+let W, H, dpr, dinero = 0, dineroMostrado = 0;
+const clips = [], chispas = [], textos = [];
+let desplazamiento = 0, proximoCorte = 1.2, pila = 0;
+
+function medir() {
+  dpr = Math.min(devicePixelRatio || 1, 2);
+  W = cv.clientWidth; H = cv.clientHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+  cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (typeof clips !== "undefined") clips.length = 0;   // al cambiar el tamaño, los clips en vuelo tenían otras coordenadas
+}
+addEventListener("resize", medir); medir();
+
+const movil = () => W < 760;
+const yLinea = () => movil() ? H * .80 : H * .84;
+const xCabezal = () => movil() ? W * .5 : W * .56;
+const destino = i => {               // dónde se apilan los clips (abanico a la derecha)
+  const baseX = movil() ? W * .80 : W * .86, baseY = movil() ? H * .15 : H * .36;
+  const ang = (i % 5 - 2) * 0.11;
+  return {x: baseX + (i % 5 - 2) * (movil() ? 10 : 18), y: baseY + (i % 5) * 3, a: ang};
+};
+const ruido = x => Math.sin(x * .021) * .5 + Math.sin(x * .057 + 1.3) * .3 + Math.sin(x * .131 + 2.1) * .2;
+
+function rr(x, y, w, h, r) { cx.beginPath(); cx.roundRect(x, y, w, h, r); }
+
+function dibujarFondo() {
+  cx.fillStyle = "#0a0b0d"; cx.fillRect(0, 0, W, H);
+  cx.strokeStyle = "rgba(255,255,255,.035)"; cx.lineWidth = 1;
+  const p = 48, off = (desplazamiento * .25) % p;
+  cx.beginPath();
+  for (let x = -off; x < W; x += p) { cx.moveTo(x, 0); cx.lineTo(x, H); }
+  for (let y = 0; y < H; y += p) { cx.moveTo(0, y); cx.lineTo(W, y); }
+  cx.stroke();
+}
+
+function dibujarLinea(t) {
+  const y = yLinea(), alto = movil() ? 34 : 46, xc = xCabezal();
+  // fotogramas
+  const paso = movil() ? 46 : 62, off = desplazamiento % paso;
+  for (let x = -off - paso; x < W + paso; x += paso) {
+    const id = Math.floor((x + desplazamiento) / paso);
+    const tono = 22 + (Math.sin(id * 1.7) * .5 + .5) * 14;
+    rr(x + 2, y, paso - 4, alto, 6);
+    const g = cx.createLinearGradient(0, y, 0, y + alto);
+    g.addColorStop(0, `hsl(${(id * 37) % 360} 18% ${tono}%)`); g.addColorStop(1, `hsl(${(id * 37) % 360} 12% ${tono * .55}%)`);
+    cx.fillStyle = g; cx.fill();
+  }
+  // forma de onda
+  cx.fillStyle = "rgba(238,240,243,.22)";
+  const bw = 3, gap = 2;
+  for (let x = 0; x < W; x += bw + gap) {
+    const v = Math.abs(ruido(x + desplazamiento)) * (movil() ? 26 : 38) + 3;
+    cx.fillRect(x, y - 10 - v, bw, v);
+  }
+  // regla de tiempo
+  cx.fillStyle = "rgba(138,144,155,.55)"; cx.font = "500 10px JetBrains Mono, monospace";
+  const pr = 120, offr = desplazamiento % pr;
+  for (let x = -offr; x < W; x += pr) {
+    const s = Math.floor((x + desplazamiento) / pr) * 4;
+    cx.fillRect(x, y + alto + 8, 1, 6);
+    cx.fillText(`${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`, x + 4, y + alto + 16);
+  }
+  // cabezal
+  cx.strokeStyle = LIMA; cx.lineWidth = 2;
+  cx.beginPath(); cx.moveTo(xc, y - 70); cx.lineTo(xc, y + alto + 6); cx.stroke();
+  cx.fillStyle = LIMA; cx.beginPath(); cx.moveTo(xc - 7, y - 78); cx.lineTo(xc + 7, y - 78); cx.lineTo(xc, y - 68); cx.fill();
+  cx.shadowColor = LIMA; cx.shadowBlur = 18; cx.fillRect(xc - 1, y - 70, 2, 2); cx.shadowBlur = 0;
+}
+
+function tijera(x, y, abre, color) {
+  cx.save(); cx.translate(x, y); cx.strokeStyle = color; cx.lineWidth = 2;
+  for (const s of [-1, 1]) {
+    cx.save(); cx.rotate(s * abre);
+    cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(0, 18); cx.stroke();
+    cx.beginPath(); cx.arc(0, -6, 5, 0, Math.PI * 2); cx.stroke();
+    cx.restore();
+  }
+  cx.restore();
+}
+
+function nuevoClip() {
+  const y = yLinea(), alto = movil() ? 34 : 46, ancho = movil() ? 70 : 104, xc = xCabezal();
+  const i = pila++;
+  clips.push({ t: 0, x0: xc - ancho / 2, y0: y, w0: ancho, h0: alto, i, d: destino(i), hue: (i * 53) % 360, aterrizo: false });
+  for (let k = 0; k < 14; k++) chispas.push({ x: xc + (Math.random() - .5) * ancho, y: y + alto / 2, vx: (Math.random() - .5) * 3, vy: -Math.random() * 3 - 1, v: 1, c: Math.random() < .5 ? CORAL : LIMA });
+}
+
+const suave = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+function dibujarClips(dt) {
+  const cw = movil() ? 48 : 92, ch = cw * 16 / 9;
+  for (const c of clips) {
+    c.t = Math.min(1, c.t + dt / 1.5);
+    const e = suave(c.t);
+    const fase1 = Math.min(1, c.t / .25);       // resaltar el corte
+    const x = c.x0 + (c.d.x - cw / 2 - c.x0) * e, y = c.y0 + (c.d.y - ch / 2 - c.y0) * e - Math.sin(e * Math.PI) * 60;
+    const w = c.w0 + (cw - c.w0) * e, h = c.h0 + (ch - c.h0) * e;
+    cx.save();
+    cx.translate(x + w / 2, y + h / 2); cx.rotate(c.d.a * e);
+    rr(-w / 2, -h / 2, w, h, 6 + 6 * e);
+    const g = cx.createLinearGradient(0, -h / 2, 0, h / 2);
+    g.addColorStop(0, `hsl(${c.hue} 40% 26%)`); g.addColorStop(1, `hsl(${(c.hue + 40) % 360} 35% 12%)`);
+    cx.fillStyle = g; cx.fill();
+    cx.lineWidth = 1.5; cx.strokeStyle = c.t < .3 ? CORAL : "rgba(255,255,255,.14)"; cx.stroke();
+    if (e > .6) {                                   // la tarjeta se vuelve un reel: play, barra y texto
+      const a = (e - .6) / .4;
+      cx.globalAlpha = a;
+      cx.fillStyle = "rgba(255,255,255,.9)";
+      cx.beginPath(); cx.moveTo(-6, -9); cx.lineTo(9, 0); cx.lineTo(-6, 9); cx.fill();
+      cx.fillStyle = "rgba(255,255,255,.15)"; rr(-w / 2 + 8, h / 2 - 14, w - 16, 3, 2); cx.fill();
+      cx.fillStyle = LIMA; rr(-w / 2 + 8, h / 2 - 14, (w - 16) * ((performance.now() / 2600 + c.i * .3) % 1), 3, 2); cx.fill();
+      cx.fillStyle = "rgba(255,255,255,.55)"; rr(-w / 2 + 8, h / 2 - 30, w * .55, 4, 2); cx.fill(); rr(-w / 2 + 8, h / 2 - 22, w * .35, 4, 2); cx.fill();
+      cx.globalAlpha = 1;
+    }
+    cx.restore();
+    if (fase1 < 1) { tijera(c.x0, c.y0 - 14, .5 * (1 - fase1), CORAL); tijera(c.x0 + c.w0, c.y0 - 14, .5 * (1 - fase1), CORAL); }
+    if (c.t >= 1 && !c.aterrizo) {
+      c.aterrizo = true;
+      const ganado = 6000 + Math.random() * 14000 + dinero * .13;   // crece cada vez más: interés compuesto de clips
+      dinero += ganado;
+      textos.push({ x: c.d.x, y: c.d.y - ch / 2 - 10, v: 1, s: "+$" + fmt(ganado) });
+    }
+  }
+  while (clips.length > 7) clips.shift();
+}
+
+function dibujarExtras(dt) {
+  for (const p of chispas) { p.x += p.vx; p.y += p.vy; p.vy += .12; p.v -= dt * 1.4; cx.globalAlpha = Math.max(0, p.v); cx.fillStyle = p.c; cx.fillRect(p.x, p.y, 2.5, 2.5); }
+  cx.globalAlpha = 1;
+  for (let i = chispas.length - 1; i >= 0; i--) if (chispas[i].v <= 0) chispas.splice(i, 1);
+  cx.font = "700 15px Space Grotesk, sans-serif"; cx.textAlign = "center";
+  for (const t of textos) { t.y -= dt * 34; t.v -= dt * .6; cx.globalAlpha = Math.max(0, t.v); cx.fillStyle = ORO; cx.fillText(t.s, t.x, t.y); }
+  cx.globalAlpha = 1; cx.textAlign = "start";
+  for (let i = textos.length - 1; i >= 0; i--) if (textos[i].v <= 0) textos.splice(i, 1);
+}
+
+let antes = performance.now(), reloj = 0;
+function cuadro(ahora) {
+  const dt = Math.min(.05, (ahora - antes) / 1000); antes = ahora; reloj += dt;
+  desplazamiento += dt * (movil() ? 70 : 110);
+  dibujarFondo(); dibujarLinea(reloj);
+  if (reloj > proximoCorte) { nuevoClip(); proximoCorte = reloj + 1.9 + Math.random() * .8; }
+  dibujarClips(dt); dibujarExtras(dt);
+  dineroMostrado += (dinero - dineroMostrado) * Math.min(1, dt * 4);
+  if (dinero > 9.9e6) { dinero = 0; dineroMostrado = 0; }   // vuelve a empezar al llegar a casi 10 millones
+  dineroEl.textContent = fmt(dineroMostrado);
+  if (!quieto) requestAnimationFrame(cuadro);
+}
+if (quieto) { dinero = dineroMostrado = 1250000; nuevoClip(); clips[0].t = 1; cuadro(performance.now()); }
+else requestAnimationFrame(cuadro);
+
+/* ================= los links aparecen al bajar ================= */
+const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add("visto"); io.unobserve(e.target); } }), { threshold: .2 });
+document.querySelectorAll(".link").forEach((l, i) => { l.style.transitionDelay = i * 90 + "ms"; io.observe(l); });
+
+/* ================= terminal que se escribe sola ================= */
+const lineas = [
+  ['<span class="c"># 1. el vivo no para; Clipper tampoco</span>'],
+  ['<span class="k">vivo</span> = <span class="f">grabar</span>(<span class="s">"la_mansion_vip"</span>)'],
+  ['<span class="k">momento</span> = <span class="f">juez</span>(vivo).<span class="f">mejor</span>()   <span class="c"># risas, gritos, chat</span>'],
+  [''],
+  ['<span class="c"># 2. cortar</span>'],
+  ['<span class="k">clip</span> = <span class="f">cortar</span>(vivo, momento, segundos=<span class="n">45</span>)'],
+  ['clip.<span class="f">subtitulos</span>().<span class="f">marco</span>(<span class="s">"THZ CLIPS"</span>)'],
+  [''],
+  ['<span class="c"># 3. subir</span>'],
+  ['<span class="f">publicar</span>(clip, [<span class="s">"Stream clips"</span>, <span class="s">"THZ CLIPS"</span>])'],
+  [''],
+  ['<span class="c"># 4. cobrar</span>'],
+  ['ganancias += <span class="n">1_250_000</span>   <span class="c"># y repetir</span>'],
+];
+const cod = document.getElementById("codigo");
+function texto(html) { const d = document.createElement("div"); d.innerHTML = html; return d.textContent; }
+async function escribir() {
+  while (true) {
+    cod.innerHTML = "";
+    for (const [html] of lineas) {
+      const plano = texto(html);
+      for (let i = 0; i <= plano.length; i++) {
+        cod.innerHTML = (cod.dataset.listo || "") + recortar(html, i) + '<span class="cursor"></span>';
+        if (!quieto) await new Promise(r => setTimeout(r, plano[i - 1] === " " ? 12 : 22 + Math.random() * 30));
+      }
+      cod.dataset.listo = (cod.dataset.listo || "") + html + "\n";
+      if (!quieto) await new Promise(r => setTimeout(r, 160));
+    }
+    cod.innerHTML = cod.dataset.listo + '<span class="cursor"></span>';
+    if (quieto) return;
+    await new Promise(r => setTimeout(r, 3800));
+    cod.dataset.listo = "";
+  }
+}
+function recortar(html, n) {          // corta el HTML coloreado a n caracteres visibles sin romper las etiquetas
+  let out = "", vis = 0, abiertos = 0;
+  for (let i = 0; i < html.length && vis < n; ) {
+    if (html[i] === "<") { const j = html.indexOf(">", i); const tag = html.slice(i, j + 1); out += tag; abiertos += tag[1] === "/" ? -1 : 1; i = j + 1; }
+    else if (html[i] === "&") { const j = html.indexOf(";", i); out += html.slice(i, j + 1); vis++; i = j + 1; }
+    else { out += html[i++]; vis++; }
+  }
+  return out + "</span>".repeat(Math.max(0, abiertos));
+}
+new IntersectionObserver((es, o) => { if (es[0].isIntersecting) { escribir(); o.disconnect(); } }, { threshold: .3 }).observe(cod);
+
+/* ================= gráfica de vistas que sube ================= */
+const gc = document.getElementById("grafica"), gx = gc.getContext("2d"), vistasEl = document.getElementById("vistas");
+const puntos = []; let vistas = 0, tg = 0;
+function gMedir() { const d = Math.min(devicePixelRatio || 1, 2); gc.width = gc.clientWidth * d; gc.height = gc.clientHeight * d; gx.setTransform(d, 0, 0, d, 0, 0); }
+addEventListener("resize", gMedir); gMedir();
+function gCuadro() {
+  const w = gc.clientWidth, h = gc.clientHeight;
+  tg += 1;
+  if (tg % 6 === 0) {
+    const ultimo = puntos.length ? puntos[puntos.length - 1] : 0;
+    puntos.push(ultimo + Math.max(-.02, (Math.random() - .3) * .06 + (Math.random() < .07 ? .18 : 0)));
+    if (puntos.length > 60) puntos.shift();
+    vistas += 2000 + Math.random() * 18000 + vistas * .004;
+    if (vistas > 48e6) { vistas = 0; puntos.length = 0; }
+    vistasEl.textContent = vistas >= 1e6 ? (vistas / 1e6).toFixed(1) + "M" : fmt(vistas);
+  }
+  gx.clearRect(0, 0, w, h);
+  if (puntos.length > 1) {
+    const mn = Math.min(...puntos), mx = Math.max(...puntos) || 1, rango = Math.max(.2, mx - mn);
+    const px = i => i / 59 * w, py = v => h - 8 - (v - mn) / rango * (h - 24);
+    gx.beginPath(); puntos.forEach((v, i) => i ? gx.lineTo(px(i), py(v)) : gx.moveTo(px(i), py(v)));
+    const g = gx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, "rgba(198,244,50,.28)"); g.addColorStop(1, "rgba(198,244,50,0)");
+    gx.lineTo(px(puntos.length - 1), h); gx.lineTo(0, h); gx.closePath(); gx.fillStyle = g; gx.fill();
+    gx.beginPath(); puntos.forEach((v, i) => i ? gx.lineTo(px(i), py(v)) : gx.moveTo(px(i), py(v)));
+    gx.strokeStyle = LIMA; gx.lineWidth = 2; gx.stroke();
+    const ux = px(puntos.length - 1), uy = py(puntos[puntos.length - 1]);
+    gx.fillStyle = LIMA; gx.beginPath(); gx.arc(ux, uy, 4, 0, Math.PI * 2); gx.fill();
+    gx.strokeStyle = "rgba(198,244,50,.35)"; gx.beginPath(); gx.arc(ux, uy, 8 + Math.sin(tg / 8) * 2, 0, Math.PI * 2); gx.stroke();
+  }
+  if (!quieto) requestAnimationFrame(gCuadro);
+}
+if (quieto) { for (let i = 0; i < 60; i++) { tg = 5; gCuadro(); tg = 0; } } else requestAnimationFrame(gCuadro);
+})();
+</script>
+</body>
+</html>
