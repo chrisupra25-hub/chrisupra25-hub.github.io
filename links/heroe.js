@@ -1,5 +1,5 @@
 /* heroe.js — mi día en 3D, hecho solo con código (Three.js).
-   Me despierto → me siento en la PC de $12K → saco clips → los subo → registro cobros y pagos. 24 s en bucle. */
+   Me despierto → me siento en mi PC → saco clips → los subo → registro cobros y pagos. 24 s en bucle. */
 const fmt = n => Math.round(n).toLocaleString("en-US");
 const LIMA = "#c6f432", CORAL = "#ff5a4e", ORO = "#ffd166", AZUL = "#1877f2", TT = "#fe2c55";
 const MONO = "JetBrains Mono, monospace", SANS = "Inter, sans-serif", TIT = "Space Grotesk, sans-serif";
@@ -13,7 +13,7 @@ const lerp = (a, b, k) => a + (b - a) * k;
 const T = 24;
 const ESCENAS = [
   { a: 0,   b: 4,   h: "07:00", txt: "Me despierto" },
-  { a: 4,   b: 8.4, h: "07:12", txt: "Me siento en mi PC gaming de $12K" },
+  { a: 4,   b: 8.4, h: "07:12", txt: "Me siento en mi PC" },
   { a: 8.4, b: 13,  h: "08:30", txt: "Saco clips del vivo" },
   { a: 13,  b: 17,  h: "11:00", txt: "Los subo a mis redes" },
   { a: 17,  b: 24,  h: "23:00", txt: "Registro los cobros y los pagos" },
@@ -486,12 +486,6 @@ async function iniciar3D() {
   pon(new THREE.CylinderGeometry(.04, .04, .025, 28), M("#15171c", { r: .3, m: .6 }), -.06, .38, -.2, pc).rotation.x = Math.PI / 2;
   const bombaLuz = new THREE.MeshBasicMaterial({ color: "#000" });
   pon(new THREE.TorusGeometry(.03, .004, 6, 28), bombaLuz, -.06, .38, -.186, pc, false);
-  const precioCv = lienzo(512, 120, (g, w, h) => {
-    g.fillStyle = LIMA; g.beginPath(); g.roundRect ? g.roundRect(6, 6, w - 12, h - 30, 44) : g.rect(6, 6, w - 12, h - 30); g.fill();
-    g.beginPath(); g.moveTo(w / 2 - 14, h - 25); g.lineTo(w / 2 + 14, h - 25); g.lineTo(w / 2, h - 4); g.fill();
-    g.fillStyle = "#0a0b0d"; g.font = `700 40px ${MONO}`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("PC GAMING · $12,000", w / 2, (h - 24) / 2 + 3);
-  });
-  const precio = sprite(precioCv, .62, .145); precio.position.set(.85, 1.5, -1.9);
 
   /* ---------- la silla gamer ---------- */
   const silla = grupo(1.75, 0, -1.05);
@@ -690,8 +684,6 @@ async function iniciar3D() {
     aplicar(posePersona(t), t);
     silla.rotation.y = giroSilla(t) + (t > 7.9 ? Math.sin(t * .8) * .03 : 0);
     const kA = ease(seg(t, 7.6, 7.9)); audMesa.visible = kA < .5; R.aud.visible = kA > 0; R.aud.scale.setScalar(Math.max(.001, kA));
-    // etiqueta de precio
-    const pe = salto(seg(t, 6.1, 6.6)) * (1 - seg(t, 7.2, 7.5)); precio.visible = pe > .01; precio.scale.set(.62 * pe, .145 * pe, 1); precio.position.y = 1.47 + Math.sin(t * 3) * .01;
     // vapor del café
     vapor.forEach((v, i) => { const o = (t * .45 + i / 3) % 1; v.visible = t > 6.5 && t < 17.5; v.position.set(1.22 + Math.sin(o * 6 + i) * .015, .9 + o * .2, -1.62); v.scale.setScalar(.04 + o * .07); v.material.opacity = Math.sin(o * Math.PI) * .5; });
     camara(t);
