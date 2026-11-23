@@ -226,7 +226,7 @@ function modo2D() {
    EL MUNDO 3D
    ============================================================ */
 async function iniciar3D() {
-  const [THREE, { RoundedBoxGeometry }, { RoomEnvironment }, { EffectComposer }, { RenderPass }, { UnrealBloomPass }, { OutputPass }] = await Promise.all([
+  const [THREE, { RoundedBoxGeometry }, { RoomEnvironment }, { EffectComposer }, { RenderPass }, { UnrealBloomPass }, { OutputPass }, { GTAOPass }, { ShaderPass }, { RectAreaLightUniformsLib }] = await Promise.all([
     import("three"),
     import("three/addons/geometries/RoundedBoxGeometry.js"),
     import("three/addons/environments/RoomEnvironment.js"),
@@ -234,7 +234,11 @@ async function iniciar3D() {
     import("three/addons/postprocessing/RenderPass.js"),
     import("three/addons/postprocessing/UnrealBloomPass.js"),
     import("three/addons/postprocessing/OutputPass.js"),
+    import("three/addons/postprocessing/GTAOPass.js"),
+    import("three/addons/postprocessing/ShaderPass.js"),
+    import("three/addons/lights/RectAreaLightUniformsLib.js"),
   ]);
+  RectAreaLightUniformsLib.init();
   await Promise.race([document.fonts ? document.fonts.ready : null, new Promise(r => setTimeout(r, 1500))]);
 
   const movil = matchMedia("(max-width: 900px)").matches;
@@ -255,9 +259,44 @@ async function iniciar3D() {
   const composer = new EffectComposer(renderer, rt);
   composer.setPixelRatio(pr);
   composer.addPass(new RenderPass(escena, cam));
+  // sombras de contacto (oclusión ambiental), solo en compu
+  const gtao = new GTAOPass(escena, cam, 256, 256);
+  gtao.updateGtaoMaterial({ radius: .32, distanceExponent: 1.4, thickness: 1.2, scale: 1.1, samples: 16 });
+  gtao.blendIntensity = .9; gtao.enabled = !movil;
+  gtao.overrideVisibility = function () {   // lo transparente y los sprites no hacen sombra
+    const c = this._visibilityCache;
+    this.scene.traverse(o => { c.set(o, o.visible); if (o.isPoints || o.isLine || o.isSprite || (o.material && o.material.transparent)) o.visible = false; });
+  };
+  gtao.output = GTAOPass.OUTPUT.Diffuse;   // la mezcla propia de GTAO a veces deja la imagen en negro: se mezcla aparte
+  composer.addPass(gtao);
+  const sombraAO = new ShaderPass({
+    uniforms: { tDiffuse: { value: null }, tAO: { value: null }, k: { value: .9 } },
+    vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }",
+    fragmentShader: "uniform sampler2D tDiffuse, tAO; uniform float k; varying vec2 vUv; void main(){ vec4 c = texture2D(tDiffuse, vUv); float a = clamp(texture2D(tAO, vUv).r, 0., 1.); gl_FragColor = vec4(c.rgb * mix(1., a, k), 1.); }",
+  });
+  sombraAO.uniforms.tAO.value = gtao.pdRenderTarget.texture;   // ShaderPass clona los uniforms y deja en null las texturas de render
+  sombraAO.enabled = gtao.enabled;
+  composer.addPass(sombraAO);
   const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), .6, .5, 1.5);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
+  // acabado de cine: viñeta, grano fino y un leve tono cálido en las luces
+  const cine = new ShaderPass({
+    uniforms: { tDiffuse: { value: null }, uT: { value: 0 } },
+    vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }",
+    fragmentShader: `uniform sampler2D tDiffuse; uniform float uT; varying vec2 vUv;
+      float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+      void main(){
+        vec4 c = texture2D(tDiffuse, vUv);
+        vec2 d = vUv - .5; float v = smoothstep(.85, .2, length(d * vec2(1.15, 1.)));
+        c.rgb *= mix(.72, 1., v);
+        float l = dot(c.rgb, vec3(.299, .587, .114));
+        c.rgb = mix(c.rgb, c.rgb * vec3(1.03, 1., .95), smoothstep(.4, 1., l));
+        c.rgb += (h(vUv * 913. + uT) - .5) * .022;
+        gl_FragColor = c;
+      }`,
+  });
+  composer.addPass(cine);
   function medir() {
     const w = Math.max(2, caja.clientWidth), h = Math.max(2, caja.clientHeight);
     renderer.setSize(w, h, false); composer.setSize(w, h);
@@ -274,6 +313,44 @@ async function iniciar3D() {
   const textura = cv => { const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; };
   const lienzo = (w, h, f) => { const cv = document.createElement("canvas"); cv.width = w; cv.height = h; f(cv.getContext("2d"), w, h); return cv; };
   const sprite = (cv, w, h) => { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: textura(cv), transparent: true, depthWrite: false })); s.scale.set(w, h, 1); escena.add(s); return s; };
+  // ruido suave que se repite sin costuras (para relieves de tela, yeso, pelo)
+  function ruido(gx, gy = gx) {
+    const v = Array.from({ length: gx * gy }, Math.random), at = (i, j) => v[((j % gy + gy) % gy) * gx + ((i % gx + gx) % gx)];
+    return (u, w) => { const x = u * gx, y = w * gy, i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j, sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+      return lerp(lerp(at(i, j), at(i + 1, j), sx), lerp(at(i, j + 1), at(i + 1, j + 1), sx), sy); };
+  }
+  // mapa de relieve (normal map) a partir de una altura h(u,v) en [0,1]
+  function relieveDe(alt, N, fuerza, rx = 1, ry = rx) {
+    const cv = document.createElement("canvas"); cv.width = cv.height = N; const g = cv.getContext("2d"), img = g.createImageData(N, N);
+    const k = i => (i + N) % N;
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const dx = (alt[y * N + k(x + 1)] - alt[y * N + k(x - 1)]) * fuerza, dy = (alt[k(y + 1) * N + x] - alt[k(y - 1) * N + x]) * fuerza;
+      const l = Math.hypot(dx, dy, 1), o = (y * N + x) * 4;
+      img.data[o] = (-dx / l * .5 + .5) * 255; img.data[o + 1] = (dy / l * .5 + .5) * 255; img.data[o + 2] = (1 / l * .5 + .5) * 255; img.data[o + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+    const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry); t.anisotropy = 8; return t;
+  }
+  function relieve(N, f, fuerza, rx, ry) { const a = new Float32Array(N * N); for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) a[y * N + x] = f(x / N, y / N); return relieveDe(a, N, fuerza, rx, ry); }
+  function relieveLienzo(cv, fuerza, rx, ry) {   // usa el brillo de un dibujo como altura
+    const N = cv.width, d = cv.getContext("2d").getImageData(0, 0, N, N).data, a = new Float32Array(N * N);
+    for (let i = 0; i < N * N; i++) a[i] = (d[i * 4] * .3 + d[i * 4 + 1] * .59 + d[i * 4 + 2] * .11) / 255;
+    return relieveDe(a, N, fuerza, rx, ry);
+  }
+  const rF = ruido(48), rG = ruido(12), rH = ruido(96, 6), rP = ruido(24), rP2 = ruido(90);
+  const nPolar = relieve(128, (u, v) => rF(u, v) * .7 + rG(u, v) * .3, 3, 6, 6);                       // felpa del buzo
+  const nDenim = relieve(128, (u, v) => .5 + .35 * Math.sin((u * 2 + v) * Math.PI * 2 * 16) + .3 * rF(u, v), 2.2, 3, 4);
+  const nPelo = relieve(128, (u, v) => rH(u, v), 5, 2, 2);
+  const nYeso = relieve(256, (u, v) => rP(u, v) * .6 + rP2(u, v) * .4, 1.6, 5, 3);
+  const nLino = relieve(128, (u, v) => .5 + .2 * Math.sin(u * Math.PI * 2 * 32) + .2 * Math.sin(v * Math.PI * 2 * 32) + .3 * rF(u, v), 1.6, 3, 6);
+  const nAcolchado = relieve(256, (u, v) => {
+    const p = ((u + v) * 3) % 1, q = ((u - v + 2) * 3) % 1;
+    return Math.pow(Math.sin(Math.PI * p) * Math.sin(Math.PI * q), .45) * .9 + rF(u, v) * .1;
+  }, 5, 2.2, 2.2);
+  // telas: aterciopeladas en los bordes (sheen), como la ropa de verdad
+  const Tela = (color, o = {}) => new THREE.MeshPhysicalMaterial({ color, roughness: o.r ?? .92, metalness: 0, envMapIntensity: o.env ?? .35,
+    sheen: o.sheen ?? 1, sheenRoughness: o.sr ?? .55, sheenColor: new THREE.Color(o.sc ?? color).lerp(new THREE.Color("#ffffff"), .35),
+    normalMap: o.n ?? nPolar, normalScale: new THREE.Vector2(o.ns ?? .6, o.ns ?? .6), ...(o.x || {}) });
 
   /* ---------- luces ---------- */
   const hemi = new THREE.HemisphereLight("#a9b8ff", "#2a1d14", .5); escena.add(hemi);
@@ -283,13 +360,15 @@ async function iniciar3D() {
   sol.shadow.bias = -.0004; sol.shadow.normalBias = .02;
   sol.target.position.set(.2, 0, .3); escena.add(sol, sol.target);
   const relleno = new THREE.DirectionalLight("#c4ccff", .3); relleno.position.set(2, 3, 6); escena.add(relleno);
-  const lMon = new THREE.PointLight("#9fbcff", 0, 3.5, 2); lMon.position.set(1.74, 1.25, -1.55); escena.add(lMon);
+  // la pantalla alumbra como un panel (luz de área del mismo tamaño que el monitor)
+  const lMon = new THREE.RectAreaLight("#a9c2ff", 0, 1.1, .68); lMon.position.set(1.75, 1.27, -1.99); lMon.lookAt(1.75, 1.2, 0); escena.add(lMon);
+  const lMonV = new THREE.RectAreaLight("#c7b8ff", 0, .36, .64); lMonV.position.set(2.6, 1.24, -1.93); lMonV.lookAt(2.6 - Math.sin(.5) * 3, 1.2, -1.93 + Math.cos(.5) * 3); escena.add(lMonV);
   const lLed = new THREE.PointLight(LIMA, 0, 4, 2); lLed.position.set(1.7, 1.9, -2.05); escena.add(lLed);
   const lPc = new THREE.PointLight(CORAL, 0, 2.2, 2); lPc.position.set(.85, 1.05, -1.7); escena.add(lPc);
   const lLamp = new THREE.PointLight("#ffb46b", 0, 4.5, 2); lLamp.position.set(-1.3, .86, -2.05); escena.add(lLamp);
 
   /* ---------- el cuarto ---------- */
-  const madera = textura(lienzo(1024, 1024, (g, W) => {
+  const maderaCv = lienzo(1024, 1024, (g, W) => {
     const ancho = 128;
     for (let x = 0; x < W; x += ancho) {
       let y = -Math.random() * 400;
@@ -302,10 +381,15 @@ async function iniciar3D() {
       }
       g.fillStyle = "rgba(0,0,0,.65)"; g.fillRect(x, 0, 3, W);
     }
-  }));
+  });
+  const madera = textura(maderaCv);
   madera.wrapS = madera.wrapT = THREE.RepeatWrapping; madera.repeat.set(6, 4.7);
-  const piso = pon(new THREE.PlaneGeometry(9, 7), M("#fff", { r: .5, env: .55, x: { map: madera } }), .2, 0, .9, escena, false); piso.rotation.x = -Math.PI / 2;
-  const pared = M("#1c1f27", { r: .95, env: .25 });
+  // relieve de las tablas (juntas hundidas y veta) y brillo que varía como barniz gastado
+  const maderaN = relieveLienzo(maderaCv, 6, 6, 4.7);
+  const rB = ruido(16), maderaR = textura(lienzo(256, 256, (g) => { const im = g.createImageData(256, 256); for (let i = 0; i < 65536; i++) { const v = 120 + rB((i % 256) / 256, Math.floor(i / 256) / 256) * 110; im.data[i * 4] = im.data[i * 4 + 1] = im.data[i * 4 + 2] = v; im.data[i * 4 + 3] = 255; } g.putImageData(im, 0, 0); }));
+  maderaR.colorSpace = THREE.NoColorSpace; maderaR.wrapS = maderaR.wrapT = THREE.RepeatWrapping; maderaR.repeat.set(2, 2);
+  const piso = pon(new THREE.PlaneGeometry(9, 7), M("#fff", { r: .62, env: .6, x: { map: madera, normalMap: maderaN, normalScale: new THREE.Vector2(.8, .8), roughnessMap: maderaR } }), .2, 0, .9, escena, false); piso.rotation.x = -Math.PI / 2;
+  const pared = M("#1c1f27", { r: .95, env: .25, x: { normalMap: nYeso, normalScale: new THREE.Vector2(.35, .35) } });
   const ZP = -2.3, VX0 = -1.25, VX1 = .05, VY0 = 1.0, VY1 = 2.1, PX0 = -3.6, PX1 = 3.4, ALTO = 2.9;
   const trozo = (x0, x1, y0, y1) => pon(new THREE.BoxGeometry(x1 - x0, y1 - y0, .12), pared, (x0 + x1) / 2, (y0 + y1) / 2, ZP - .06);
   trozo(PX0, VX0, 0, ALTO); trozo(VX1, PX1, 0, ALTO); trozo(VX0, VX1, 0, VY0); trozo(VX0, VX1, VY1, ALTO);
@@ -320,6 +404,20 @@ async function iniciar3D() {
   for (const x of [VX0, VX1]) pon(new THREE.BoxGeometry(.05, VY1 - VY0, .1), marcoV, x, (VY0 + VY1) / 2, ZP);
   pon(new THREE.BoxGeometry(.025, VY1 - VY0, .05), marcoV, VXc, (VY0 + VY1) / 2, ZP - .02);
   pon(new THREE.BoxGeometry(VX1 - VX0, .025, .05), marcoV, VXc, (VY0 + VY1) / 2 + .1, ZP - .02);
+  // cortinas recogidas a los lados, con pliegues de verdad
+  const barra = pon(new THREE.CylinderGeometry(.012, .012, 1.95, 12), M("#b9b2a6", { r: .3, m: .85 }), VXc + .03, 2.22, ZP + .09); barra.rotation.z = Math.PI / 2;
+  const cortinaM = Tela("#4a3f5c", { n: nLino, ns: .5, r: .95, x: { side: THREE.DoubleSide } });
+  function cortina(xc, ancho, pl) {
+    const geo = new THREE.PlaneGeometry(ancho, 1.3, 48, 24), pos = geo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i), abajo = (.65 - y) / 1.3;
+      pos.setZ(i, Math.sin((x / ancho + .5) * Math.PI * pl) * (.028 + abajo * .012) + Math.sin(x * 61 + y * 3) * .003);
+      pos.setX(i, x * (1 - abajo * .18));   // se cierran un poco hacia abajo, como recogidas
+    }
+    geo.computeVertexNormals();
+    const c = pon(geo, cortinaM, xc, 2.22 - .65, ZP + .075); c.castShadow = true; return c;
+  }
+  cortina(VX0 - .13, .32, 7); cortina(VX1 + .06, .2, 5);
   // cielo con ciudad (cambia con la hora)
   const cieloCv = document.createElement("canvas"); cieloCv.width = 256; cieloCv.height = 256; const kc = cieloCv.getContext("2d");
   const edificios = Array.from({ length: 16 }, (_, i) => ({ x: i * 17 - 8 + Math.random() * 6, w: 14 + Math.random() * 14, h: 40 + Math.random() * 90, v: Array.from({ length: 40 }, () => Math.random()) }));
@@ -368,10 +466,47 @@ async function iniciar3D() {
   pon(RB(1.62, .95, .12, .05), M("#3a3346", { r: .95 }), BX, .72, -2.21);
   for (let i = -2; i <= 2; i++) pon(new THREE.BoxGeometry(.012, .78, .02), M("#2e2938", { r: .95 }), BX + i * .3, .74, -2.145, escena, false);
   pon(RB(1.42, .2, 1.96, .07, 4), M("#e9e6ef", { r: .9 }), BX, .44, -1.2);
-  pon(RB(.62, .13, .36, .065, 5), M("#ffffff", { r: .85 }), BX, .6, -1.96);
+  // almohada mullida: una esfera llevada hacia un cubo, con las esquinas pellizcadas
+  {
+    const geo = new THREE.SphereGeometry(1, 48, 24), pos = geo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i), sx = Math.sign(x) * Math.pow(Math.abs(x), .45), sz = Math.sign(z) * Math.pow(Math.abs(z), .45);
+      const borde = Math.max(Math.abs(sx), Math.abs(sz));
+      pos.setXYZ(i, sx * .31, y * .075 * (1 - .55 * Math.pow(borde, 6)) + Math.sin(sx * 9) * Math.sin(sz * 7) * .006, sz * .18);
+    }
+    geo.computeVertexNormals();
+    const alm = pon(geo, Tela("#f1eff4", { n: nLino, ns: .35, sc: "#ffffff" }), BX - .02, .6, -1.97); alm.rotation.set(-.12, .06, 0);
+  }
+  // la cobija: una tela que cae sobre el colchón y sobre mí (acolchada)
   const manta = grupo(BX, .62, -.85);
-  pon(RB(1.47, .15, 1.35, .07, 5), M("#2f3a6b", { r: .95, env: .25 }), 0, 0, 0, manta);
-  pon(RB(1.49, .155, .16, .07, 5), M("#e4e2ea", { r: .9 }), 0, .004, -.62, manta);   // el borde de la sábana
+  {
+    const g = (x, s) => Math.exp(-(x / s) * (x / s)), ss = (a, b, x) => { const k = cl((x - a) / (b - a)); return k * k * (3 - 2 * k); };
+    const alto = (x, z) => {   // altura de la cobija encima del colchón (coordenadas de la cobija)
+      const pecho = .25 * Math.exp(-Math.pow(Math.abs(x) / .37, 4));
+      const piernas = Math.max(g(x - .085, .13), g(x + .085, .13)) * Math.max(lerp(.2, .15, ss(-.3, .2, z)), .2 * g(z - .4, .1)) * (1 - ss(.48, .6, z));
+      const w = ss(-.25, -.42, z);
+      return -.06 + lerp(piernas, pecho, w) + Math.sin(x * 23 + z * 6) * .008 + Math.sin(z * 17 - x * 5) * .006;
+    };
+    const HX = .71, HZ = .63, r = .05, cuarto = Math.PI * r / 2;
+    const caer = (u, lim) => {   // pasado el borde del colchón la tela se dobla y cuelga
+      const o = Math.abs(u) - lim; if (o <= 0) return [u, 0];
+      if (o < cuarto) { const a = o / r; return [Math.sign(u) * (lim + r * Math.sin(a)), -r * (1 - Math.cos(a))]; }
+      return [Math.sign(u) * (lim + r + (o - cuarto) * .12), -r - (o - cuarto)];
+    };
+    const tela = (z0, z1, sube, mat, nz) => {
+      const geo = new THREE.PlaneGeometry(1.72, z1 - z0, 96, nz), pos = geo.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        const u = pos.getX(i), w = (z0 + z1) / 2 - pos.getY(i);
+        const [x, dx] = caer(u, HX), [z, dz] = caer(w, HZ);
+        const xs = Math.sign(u) * Math.min(Math.abs(u), HX), zs = Math.min(w, HZ);
+        pos.setXYZ(i, x, alto(xs, zs) + sube + dx + dz, z);
+      }
+      geo.computeVertexNormals();
+      return pon(geo, mat, 0, 0, 0, manta);
+    };
+    tela(-.675, .8, 0, Tela("#2f3a6b", { n: nAcolchado, ns: .9, sc: "#7d8bd6", x: { side: THREE.DoubleSide } }), 80);
+    tela(-.69, -.54, .014, Tela("#e9e7ee", { n: nLino, ns: .3, sc: "#ffffff", x: { side: THREE.DoubleSide } }), 10);   // el borde de la sábana doblado
+  }
   // mesa de noche, despertador y lámpara
   pon(RB(.5, .52, .44, .025), M("#2a2d35", { r: .6 }), -1.45, .26, -2.02);
   pon(new THREE.BoxGeometry(.42, .012, .01), M("#15171c"), -1.45, .3, -1.795, escena, false);
@@ -504,44 +639,111 @@ async function iniciar3D() {
   /* ---------- yo ---------- */
   const R = {};
   {
-    const piel = M("#c98d68", { r: .55, env: .3 }), sud = M(CORAL, { r: .82 }), sud2 = M("#d94a40", { r: .85 }), pan = M("#262b38", { r: .85 });
-    const zap = M("#eef0f4", { r: .45 }), suela = M("#1a1c21", { r: .7 }), pelo = M("#141418", { r: .55, env: .5 }), ojoM = M("#0a0a0c", { r: .2, env: 1 });
+    const piel = new THREE.MeshPhysicalMaterial({ color: "#c98d68", roughness: .52, envMapIntensity: .35, sheen: .5, sheenColor: new THREE.Color("#ff9d80"), sheenRoughness: .35 });
+    const sud = Tela(CORAL, { n: nPolar, ns: .7, sc: "#ffb1a8" }), sud2 = Tela("#c9443b", { n: nLino, ns: .8, sc: "#ff8f84" });
+    const pan = Tela("#2b3550", { n: nDenim, ns: .75, r: .85, sheen: .6, sc: "#6f86b8" }), pan2 = Tela("#222a40", { n: nDenim, ns: .6, r: .85, sheen: .5 });
+    const zap = M("#eef0f4", { r: .5 }), zapG = M("#c9ccd4", { r: .6 }), suela = M("#1a1c21", { r: .75 });
+    const pelo = Tela("#17151a", { n: nPelo, ns: 1.1, r: .55, sheen: 1, sr: .3, sc: "#4a4252", env: .5 });
+    const blanco = new THREE.MeshPhysicalMaterial({ color: "#ebe6df", roughness: .2, clearcoat: 1, clearcoatRoughness: .05 });
+    const iris = new THREE.MeshPhysicalMaterial({ color: "#4a2c1a", roughness: .3, clearcoat: 1, clearcoatRoughness: .02 });
+    const negro = new THREE.MeshStandardMaterial({ color: "#050506", roughness: .1 }), labio = M("#a35a4f", { r: .5 });
+    const cil = (rt, rb, h, seg = 20) => new THREE.CylinderGeometry(rt, rb, h, seg);
     R.raiz = grupo(); R.raiz.rotation.order = "YXZ";
-    pon(new THREE.CapsuleGeometry(.12, .12, 6, 14), pan, 0, -.01, 0, R.raiz).rotation.z = Math.PI / 2;
+    // cadera del jean
+    pon(new THREE.CapsuleGeometry(.12, .12, 8, 18), pan, 0, -.01, 0, R.raiz).rotation.z = Math.PI / 2;
     R.torso = grupo(0, 0, 0, R.raiz);
-    pon(new THREE.CapsuleGeometry(.155, .24, 8, 18), sud, 0, .27, 0, R.torso).scale.set(1.12, 1, .74);
-    pon(new THREE.TorusGeometry(.085, .042, 10, 22), sud2, 0, .49, -.06, R.torso).rotation.x = Math.PI / 2 - .35;
-    for (const s of [-1, 1]) pon(new THREE.CylinderGeometry(.006, .006, .12, 6), M("#f2f2f2"), s * .03, .41, .115, R.torso, false);
-    pon(new THREE.CylinderGeometry(.05, .055, .09, 14), piel, 0, .5, 0, R.torso);
+    // tronco con forma (cintura, pecho, hombros) hecho de un perfil que gira
+    const perfil = [[.0, -.06], [.142, -.055], [.152, .02], [.148, .12], [.156, .24], [.172, .34], [.168, .41], [.138, .47], [.085, .515], [.0, .53]].map(([r, y]) => new THREE.Vector2(r, y));
+    pon(new THREE.LatheGeometry(perfil, 40), sud, 0, 0, 0, R.torso).scale.set(1.12, 1, .74);
+    pon(new THREE.TorusGeometry(.148, .02, 10, 40), sud2, 0, -.035, 0, R.torso).scale.set(1.13, .7, .75);   // pretina acanalada
+    pon(RB(.21, .09, .03, .014, 3), sud, 0, .1, .104, R.torso).rotation.x = -.04;                           // bolsillo canguro
+    for (const s of [-1, 1]) pon(cil(.003, .003, .1, 6), sud2, s * .1, .1, .121, R.torso, false).rotation.z = s * .1;
+    // capucha caída en la espalda y cuello
+    pon(new THREE.TorusGeometry(.082, .036, 12, 28), sud2, 0, .49, -.045, R.torso).rotation.x = Math.PI / 2 - .4;
+    const cap = pon(new THREE.SphereGeometry(.12, 24, 16), sud, 0, .43, -.12, R.torso); cap.scale.set(1.05, .62, .55); cap.rotation.x = .45;
+    for (const s of [-1, 1]) {   // cordones con puntas
+      const c = pon(cil(.0035, .0035, .13, 6), M("#f2f2f2", { r: .7 }), s * .032, .405, .113, R.torso, false); c.rotation.z = s * .05;
+      pon(cil(.005, .005, .018, 8), M("#c9ccd4", { r: .3, m: .8 }), s * .035, .335, .115, R.torso, false);
+    }
+    pon(cil(.048, .054, .09, 18), piel, 0, .5, .005, R.torso);
+    // cabeza
     R.cabeza = grupo(0, .54, 0, R.torso);
-    pon(new THREE.SphereGeometry(.118, 32, 24), piel, 0, .13, .005, R.cabeza).scale.set(.94, 1.05, 1);
-    pon(new THREE.SphereGeometry(.125, 32, 16, 0, Math.PI * 2, 0, Math.PI * .55), pelo, 0, .145, -.012, R.cabeza).rotation.x = -.45;
-    for (const s of [-1, 1]) pon(new THREE.SphereGeometry(.026, 12, 8), piel, s * .112, .12, -.005, R.cabeza).scale.set(.6, 1, .8);
-    pon(new THREE.SphereGeometry(.018, 12, 8), piel, 0, .115, .118, R.cabeza);
-    R.ojos = [-1, 1].map(s => pon(new THREE.SphereGeometry(.014, 12, 8), ojoM, s * .042, .14, .108, R.cabeza, false));
+    pon(new THREE.SphereGeometry(.118, 40, 30), piel, 0, .13, .005, R.cabeza).scale.set(.93, 1.05, 1);
+    pon(new THREE.SphereGeometry(.1, 32, 20), piel, 0, .07, .022, R.cabeza).scale.set(.82, .74, .98);          // mandíbula y mentón
+    for (const s of [-1, 1]) pon(new THREE.SphereGeometry(.03, 16, 12), piel, s * .055, .1, .088, R.cabeza, false).scale.set(1, .8, .6);   // pómulos
+    pon(new THREE.SphereGeometry(.017, 16, 12), piel, 0, .108, .126, R.cabeza).scale.set(.85, .9, 1);          // nariz
+    pon(new THREE.CapsuleGeometry(.0075, .028, 4, 10), piel, 0, .132, .119, R.cabeza).rotation.x = .3;          // tabique
+    for (const s of [-1, 1]) pon(new THREE.SphereGeometry(.0075, 10, 8), piel, s * .011, .1, .121, R.cabeza, false);   // aletas
+    const boca = pon(new THREE.TorusGeometry(.03, .0042, 8, 20, Math.PI * .34), labio, 0, .098, .113, R.cabeza, false); boca.rotation.z = -Math.PI / 2 - Math.PI * .17;
+    R.ojos = [-1, 1].map(s => {
+      const o = grupo(s * .041, .142, .101, R.cabeza);
+      pon(new THREE.SphereGeometry(.0155, 20, 14), blanco, 0, 0, 0, o, false);
+      pon(new THREE.SphereGeometry(.0088, 16, 12), iris, 0, 0, .0105, o, false).scale.z = .45;
+      pon(new THREE.SphereGeometry(.0042, 12, 8), negro, 0, 0, .0138, o, false).scale.z = .4;
+      const par = pon(new THREE.SphereGeometry(.0172, 20, 10, 0, Math.PI * 2, 0, Math.PI * .42), piel, 0, 0, 0, o, false); par.rotation.x = .5;   // párpado
+      return o;
+    });
+    for (const s of [-1, 1]) { const c = pon(RB(.04, .008, .012, .003), pelo, s * .043, .169, .113, R.cabeza, false); c.rotation.set(-.25, s * .2, s * -.12); }   // cejas
+    for (const s of [-1, 1]) {   // orejas
+      const o = pon(new THREE.SphereGeometry(.027, 16, 12), piel, s * .109, .12, -.005, R.cabeza); o.scale.set(.45, 1, .8);
+      pon(new THREE.TorusGeometry(.016, .004, 6, 16), piel, s * .118, .121, -.003, R.cabeza, false).rotation.y = Math.PI / 2;
+    }
+    // pelo: una capa con mechones (relieve de puntas) y un flequillo
+    {
+      const geo = new THREE.SphereGeometry(.127, 64, 32, 0, Math.PI * 2, 0, Math.PI * .6), pos = geo.attributes.position, v = new THREE.Vector3(), n = new THREE.Vector3();
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i); n.copy(v).normalize(); const th = Math.atan2(n.x, n.z), ph = Math.acos(n.y);
+        const mech = Math.max(0, Math.sin(th * 9 + ph * 5) * Math.sin(ph * 13 - th * 3)) * .013 + Math.sin(th * 23 + ph * 31) * .0025;
+        v.addScaledVector(n, mech + .003); pos.setXYZ(i, v.x, v.y, v.z);
+      }
+      geo.computeVertexNormals();
+      pon(geo, pelo, 0, .146, -.014, R.cabeza).rotation.x = -.45;
+      const mechon = new THREE.SphereGeometry(.03, 14, 10);
+      for (let i = 0; i < 9; i++) {
+        const a = (i - 4) * .26, m = pon(mechon, pelo, Math.sin(a) * .09, .225 - Math.abs(i - 4) * .006, Math.cos(a) * .07, R.cabeza, false);
+        m.scale.set(.75, .38, 1.5); m.rotation.set(-.55 + (i % 2) * .12, a, (i - 4) * .05);
+      }
+    }
+    // brazos: hombro, brazo, codo, antebrazo, puño y mano con dedos
+    const dedo = new THREE.CapsuleGeometry(.0085, .03, 4, 10), pulgar = new THREE.CapsuleGeometry(.0095, .024, 4, 10);
     const brazo = s => {
       const h = grupo(s * .2, .44, 0, R.torso);
-      pon(new THREE.SphereGeometry(.06, 14, 10), sud, 0, 0, 0, h);
-      pon(new THREE.CapsuleGeometry(.055, .2, 6, 12), sud, 0, -.145, 0, h);
+      pon(new THREE.SphereGeometry(.064, 18, 14), sud, 0, 0, 0, h);
+      pon(cil(.06, .051, .28), sud, 0, -.14, 0, h);
       const co = grupo(0, -.29, 0, h);
-      pon(new THREE.CapsuleGeometry(.049, .17, 6, 12), sud, 0, -.12, 0, co);
-      pon(new THREE.CylinderGeometry(.045, .05, .03, 12), sud2, 0, -.215, 0, co);
-      pon(new THREE.SphereGeometry(.045, 14, 10), piel, 0, -.26, .005, co).scale.set(.85, 1.1, .7);
+      pon(new THREE.SphereGeometry(.052, 16, 12), sud, 0, 0, 0, co);
+      pon(cil(.051, .043, .2), sud, 0, -.1, 0, co);
+      pon(cil(.041, .044, .045), sud2, 0, -.215, 0, co);                 // puño acanalado
+      pon(cil(.024, .026, .04, 14), piel, 0, -.24, 0, co).scale.z = .7;   // muñeca
+      const mano = grupo(0, -.25, 0, co);
+      pon(RB(.07, .078, .03, .013, 3), piel, 0, -.042, 0, mano);
+      [[-1.5, .032], [-.5, .037], [.5, .035], [1.5, .027]].forEach(([k, l]) => {
+        const d = pon(dedo, piel, k * .0175 * s, -.09 - l * .3, -.006, mano, false); d.scale.y = l / .037; d.rotation.x = .45;
+      });
+      const p = pon(pulgar, piel, -s * .04, -.035, -.01, mano, false); p.rotation.set(.3, 0, -s * .7);
       return [h, co];
     };
     [R.hL, R.cL] = brazo(1); [R.hR, R.cR] = brazo(-1);
+    // piernas: jean con rodilla y dobladillo; tenis con suela, puntera y cordones
     const pierna = s => {
       const ca = grupo(s * .085, -.03, 0, R.raiz);
-      pon(new THREE.CapsuleGeometry(.068, .3, 6, 12), pan, 0, -.22, 0, ca);
+      pon(cil(.079, .063, .44), pan, 0, -.22, 0, ca);
       const ro = grupo(0, -.44, 0, ca);
-      pon(new THREE.CapsuleGeometry(.058, .3, 6, 12), pan, 0, -.21, 0, ro);
+      pon(new THREE.SphereGeometry(.062, 16, 12), pan, 0, 0, 0, ro);
+      pon(cil(.06, .052, .4), pan, 0, -.2, 0, ro);
+      pon(cil(.055, .056, .03), pan2, 0, -.395, 0, ro);
       const to = grupo(0, -.43, 0, ro); (s > 0 ? R.tobillos = [to] : R.tobillos.push(to));
-      pon(RB(.1, .075, .25, .035), zap, 0, -.03, .05, to);
-      pon(RB(.104, .02, .26, .008), suela, 0, -.066, .05, to);
+      pon(RB(.094, .072, .22, .034, 4), zap, 0, -.018, .035, to);                 // capellada
+      pon(new THREE.SphereGeometry(.05, 18, 12), zap, 0, -.035, .135, to).scale.set(.94, .62, 1);   // puntera
+      pon(RB(.106, .032, .272, .013, 3), zap, 0, -.06, .052, to);                 // mediasuela
+      pon(RB(.108, .01, .274, .004, 2), suela, 0, -.079, .052, to);               // suela
+      pon(RB(.05, .035, .07, .015), zapG, 0, .018, .01, to);                      // lengüeta
+      for (let k = 0; k < 4; k++) pon(new THREE.BoxGeometry(.05, .005, .007), M("#ffffff", { r: .8 }), 0, .02 - k * .006, .055 + k * .022, to, false).rotation.x = -.25;
+      for (const lado of [-1, 1]) { const f = pon(new THREE.BoxGeometry(.003, .016, .11), M(CORAL, { r: .5 }), lado * .0485, -.025, .06, to, false); f.rotation.x = .25; }
       return [ca, ro];
     };
     [R.pL, R.rL] = pierna(1); [R.pR, R.rR] = pierna(-1);
-    R.aud = audifonos(); R.aud.position.set(0, .14, -.005); R.cabeza.add(R.aud);
+    R.aud = audifonos(); R.aud.position.set(0, .145, -.005); R.cabeza.add(R.aud);
   }
   const P0 = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, lean: 0, cab: 0, cabY: 0, shL: 0, shR: 0, ab: .08, elL: -.15, elR: -.15, hipL: 0, hipR: 0, knL: 0, knR: 0, pie: 0, ojos: 1 };
   const pose = o => ({ ...P0, ...o });
@@ -664,7 +866,7 @@ async function iniciar3D() {
     bombaLuz.color.set(LIMA).multiplyScalar(2.6 * on); ratonLuz.material.color.set(LIMA).multiplyScalar(2.4 * on);
     neonMat.color.setScalar(lerp(.25, 1.9, on));
     for (const v of ventiladores) { tmp.setHSL((hue + v.i * .12) % 1, .95, .55); v.aro.material.color.copy(tmp).multiplyScalar(5 * on); v.aspas.rotation.z -= dtF * 28 * on; }
-    lMon.intensity = seg(t, 6.2, 6.7) * (1.1 + (1 - l) * 1.6);
+    lMon.intensity = seg(t, 6.2, 6.7) * (4 + (1 - l) * 6); lMonV.intensity = seg(t, 6.2, 6.7) * (2.5 + (1 - l) * 4);
     // monitores (más seguido cuando la cámara está cerca de la pantalla)
     const cerca = (t > 7.6 && t < 17.2) || t > 18.6;
     if (t > 6.1 && (cerca || n % 3 === 0)) { dibujarPantalla(t); texPantalla.needsUpdate = true; }
@@ -679,7 +881,7 @@ async function iniciar3D() {
     zetas.forEach((z, i) => { const o = (t * .8 + i / 3) % 1, f = 1 - seg(t, 1.4, 1.9); z.visible = f > 0; z.position.set(-2.32 + o * .22 + i * .03, .86 + o * .38, -1.98 + o * .1); z.scale.setScalar(.07 + i * .025); z.material.opacity = (1 - o) * f; });
     // la cobija se corre al levantarse
     const kb = ease(seg(t, 2.4, 3.1));
-    manta.position.set(BX, lerp(.62, .63, kb), lerp(-.85, -.42, kb)); manta.scale.set(1, lerp(1, 1.5, kb), lerp(1, .56, kb));
+    const sy = lerp(1, 1.5, kb); manta.position.set(BX, .62 + .07 * (sy - 1), lerp(-.85, -.42, kb)); manta.scale.set(1, sy, lerp(1, .56, kb));
     // yo, la silla y los audífonos
     aplicar(posePersona(t), t);
     silla.rotation.y = giroSilla(t) + (t > 7.9 ? Math.sin(t * .8) * .03 : 0);
@@ -688,6 +890,7 @@ async function iniciar3D() {
     vapor.forEach((v, i) => { const o = (t * .45 + i / 3) % 1; v.visible = t > 6.5 && t < 17.5; v.position.set(1.22 + Math.sin(o * 6 + i) * .015, .9 + o * .2, -1.62); v.scale.setScalar(.04 + o * .07); v.material.opacity = Math.sin(o * Math.PI) * .5; });
     camara(t);
     const t0 = performance.now();
+    cine.uniforms.uT.value = (t * 7.3) % 50;
     if (conBloom) composer.render(); else renderer.render(escena, cam);
     vigilar(performance.now() - t0, dtF);
   };
@@ -699,7 +902,7 @@ async function iniciar3D() {
     const prom = muestras.sort((a, b) => a - b)[Math.floor(muestras.length / 2)]; muestras = [];
     if (prom < 38 || nivel <= -1) return;
     nivel--;
-    if (nivel === 1) pr = 1;
+    if (nivel === 1) { pr = 1; gtao.enabled = sombraAO.enabled = false; }
     else if (nivel === 0) { conBloom = false; pr = Math.min(pr, .85); }
     else { pr = .6; renderer.shadowMap.enabled = false; escena.traverse(o => { if (o.material) o.material.needsUpdate = true; }); }
     renderer.setPixelRatio(pr); composer.setPixelRatio(pr); medir();
