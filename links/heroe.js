@@ -637,113 +637,204 @@ async function iniciar3D() {
   pon(new THREE.CylinderGeometry(1.05, 1.05, .012, 64), M("#1d2027", { r: 1, env: .1 }), 1.6, .006, -.9, escena, false);
 
   /* ---------- yo ---------- */
-  const R = {};
+  const ss = (a, b, x) => { const k = cl((x - a) / (b - a)); return k * k * (3 - 2 * k); };
+  const g2 = (dx, dy, sx, sy) => Math.exp(-(dx * dx) / (sx * sx) - (dy * dy) / (sy * sy));
+  const R = { dedos: [], manos: [] };
   {
-    const piel = new THREE.MeshPhysicalMaterial({ color: "#c98d68", roughness: .52, envMapIntensity: .35, sheen: .5, sheenColor: new THREE.Color("#ff9d80"), sheenRoughness: .35 });
+    // piel con poros finos y tono que varía (mejillas, nariz, labios, sombra de barba)
+    const rPor = ruido(160), rPor2 = ruido(40);
+    const nPiel = relieve(256, (u, v) => rPor(u, v) * .6 + rPor2(u, v) * .4, 2.2, 6, 6);
+    const pielBase = { roughness: .5, envMapIntensity: .35, sheen: .45, sheenColor: new THREE.Color("#ff9d80"), sheenRoughness: .35, normalMap: nPiel, normalScale: new THREE.Vector2(.2, .2) };
+    const piel = new THREE.MeshPhysicalMaterial({ color: "#c98d68", ...pielBase });
+    const pielCara = new THREE.MeshPhysicalMaterial({ color: "#ffffff", vertexColors: true, ...pielBase });
     const sud = Tela(CORAL, { n: nPolar, ns: .7, sc: "#ffb1a8" }), sud2 = Tela("#c9443b", { n: nLino, ns: .8, sc: "#ff8f84" });
     const pan = Tela("#2b3550", { n: nDenim, ns: .75, r: .85, sheen: .6, sc: "#6f86b8" }), pan2 = Tela("#222a40", { n: nDenim, ns: .6, r: .85, sheen: .5 });
     const zap = M("#eef0f4", { r: .5 }), zapG = M("#c9ccd4", { r: .6 }), suela = M("#1a1c21", { r: .75 });
     const pelo = Tela("#17151a", { n: nPelo, ns: 1.1, r: .55, sheen: 1, sr: .3, sc: "#4a4252", env: .5 });
-    const blanco = new THREE.MeshPhysicalMaterial({ color: "#ebe6df", roughness: .2, clearcoat: 1, clearcoatRoughness: .05 });
-    const iris = new THREE.MeshPhysicalMaterial({ color: "#4a2c1a", roughness: .3, clearcoat: 1, clearcoatRoughness: .02 });
-    const negro = new THREE.MeshStandardMaterial({ color: "#050506", roughness: .1 }), labio = M("#a35a4f", { r: .5 });
-    const cil = (rt, rb, h, seg = 20) => new THREE.CylinderGeometry(rt, rb, h, seg);
+    const peloCeja = M("#2b211c", { r: .8 });
+    const peloBase = M("#110e0d", { r: .85, env: .2 });
+    const peloRizo = new THREE.MeshPhysicalMaterial({ color: "#ffffff", roughness: .55, envMapIntensity: .45, sheen: .8, sheenColor: new THREE.Color("#5a4a5a"), sheenRoughness: .35 });
+    const blanco = new THREE.MeshPhysicalMaterial({ color: "#e3dad1", roughness: .15, clearcoat: 1, clearcoatRoughness: .03 });
+    const pestana = M("#0b0908", { r: .7 }), unaM = M("#e2b3a0", { r: .3, env: .6 });
+    const cil = (rt, rb, h, seg = 20, hs = 1) => new THREE.CylinderGeometry(rt, rb, h, seg, hs);
+    // arrugas: empuja hacia afuera/adentro la superficie de un cilindro o torno según la altura y el ángulo
+    const arrugar = (geo, f) => {
+      const p = geo.attributes.position;
+      for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), r = Math.hypot(x, z); if (r < 1e-5) continue; const k = (r + f(y, Math.atan2(x, z))) / r; p.setXYZ(i, x * k, y, z * k); }
+      geo.computeVertexNormals(); return geo;
+    };
     R.raiz = grupo(); R.raiz.rotation.order = "YXZ";
-    // cadera del jean
     pon(new THREE.CapsuleGeometry(.12, .12, 8, 18), pan, 0, -.01, 0, R.raiz).rotation.z = Math.PI / 2;
     R.torso = grupo(0, 0, 0, R.raiz);
-    // tronco con forma (cintura, pecho, hombros) hecho de un perfil que gira
-    const perfil = [[.0, -.06], [.142, -.055], [.152, .02], [.148, .12], [.156, .24], [.172, .34], [.168, .41], [.138, .47], [.085, .515], [.0, .53]].map(([r, y]) => new THREE.Vector2(r, y));
-    pon(new THREE.LatheGeometry(perfil, 40), sud, 0, 0, 0, R.torso).scale.set(1.12, 1, .74);
-    pon(new THREE.TorusGeometry(.148, .02, 10, 40), sud2, 0, -.035, 0, R.torso).scale.set(1.13, .7, .75);   // pretina acanalada
-    pon(RB(.21, .09, .03, .014, 3), sud, 0, .1, .104, R.torso).rotation.x = -.04;                           // bolsillo canguro
+    // tronco del buzo (perfil que gira) con la tela fruncida sobre la pretina
+    const perfil = new THREE.SplineCurve([[.0, -.06], [.142, -.055], [.152, .02], [.148, .12], [.156, .24], [.172, .34], [.168, .41], [.138, .47], [.085, .515], [.0, .53]].map(([r, y]) => new THREE.Vector2(r, y))).getPoints(60);
+    pon(arrugar(new THREE.LatheGeometry(perfil, 56), (y, a) => .0055 * Math.sin(a * 7 + y * 55) * ss(.17, .02, y) * ss(-.05, 0, y) + .0025 * Math.sin(a * 11 - y * 34) * ss(.32, .12, y) * ss(-.05, .06, y)), sud, 0, 0, 0, R.torso).scale.set(1.12, 1, .74);
+    pon(new THREE.TorusGeometry(.148, .02, 10, 40), sud2, 0, -.035, 0, R.torso).scale.set(1.13, .7, .75);
+    pon(RB(.21, .09, .03, .014, 3), sud, 0, .1, .104, R.torso).rotation.x = -.04;
     for (const s of [-1, 1]) pon(cil(.003, .003, .1, 6), sud2, s * .1, .1, .121, R.torso, false).rotation.z = s * .1;
-    // capucha caída en la espalda y cuello
     pon(new THREE.TorusGeometry(.082, .036, 12, 28), sud2, 0, .49, -.045, R.torso).rotation.x = Math.PI / 2 - .4;
     const cap = pon(new THREE.SphereGeometry(.12, 24, 16), sud, 0, .43, -.12, R.torso); cap.scale.set(1.05, .62, .55); cap.rotation.x = .45;
-    for (const s of [-1, 1]) {   // cordones con puntas
+    for (const s of [-1, 1]) {
       const c = pon(cil(.0035, .0035, .13, 6), M("#f2f2f2", { r: .7 }), s * .032, .405, .113, R.torso, false); c.rotation.z = s * .05;
       pon(cil(.005, .005, .018, 8), M("#c9ccd4", { r: .3, m: .8 }), s * .035, .335, .115, R.torso, false);
     }
-    pon(cil(.048, .054, .09, 18), piel, 0, .5, .005, R.torso);
-    // cabeza
-    R.cabeza = grupo(0, .54, 0, R.torso);
-    pon(new THREE.SphereGeometry(.118, 40, 30), piel, 0, .13, .005, R.cabeza).scale.set(.93, 1.05, 1);
-    pon(new THREE.SphereGeometry(.1, 32, 20), piel, 0, .07, .022, R.cabeza).scale.set(.82, .74, .98);          // mandíbula y mentón
-    for (const s of [-1, 1]) pon(new THREE.SphereGeometry(.03, 16, 12), piel, s * .055, .1, .088, R.cabeza, false).scale.set(1, .8, .6);   // pómulos
-    pon(new THREE.SphereGeometry(.017, 16, 12), piel, 0, .108, .126, R.cabeza).scale.set(.85, .9, 1);          // nariz
-    pon(new THREE.CapsuleGeometry(.0075, .028, 4, 10), piel, 0, .132, .119, R.cabeza).rotation.x = .3;          // tabique
-    for (const s of [-1, 1]) pon(new THREE.SphereGeometry(.0075, 10, 8), piel, s * .011, .1, .121, R.cabeza, false);   // aletas
-    const boca = pon(new THREE.TorusGeometry(.03, .0042, 8, 20, Math.PI * .34), labio, 0, .098, .113, R.cabeza, false); boca.rotation.z = -Math.PI / 2 - Math.PI * .17;
-    R.ojos = [-1, 1].map(s => {
-      const o = grupo(s * .041, .142, .101, R.cabeza);
-      pon(new THREE.SphereGeometry(.0155, 20, 14), blanco, 0, 0, 0, o, false);
-      pon(new THREE.SphereGeometry(.0088, 16, 12), iris, 0, 0, .0105, o, false).scale.z = .45;
-      pon(new THREE.SphereGeometry(.0042, 12, 8), negro, 0, 0, .0138, o, false).scale.z = .4;
-      const par = pon(new THREE.SphereGeometry(.0172, 20, 10, 0, Math.PI * 2, 0, Math.PI * .42), piel, 0, 0, 0, o, false); par.rotation.x = .5;   // párpado
-      return o;
-    });
-    for (const s of [-1, 1]) { const c = pon(RB(.04, .008, .012, .003), pelo, s * .043, .169, .113, R.cabeza, false); c.rotation.set(-.25, s * .2, s * -.12); }   // cejas
-    for (const s of [-1, 1]) {   // orejas
-      const o = pon(new THREE.SphereGeometry(.027, 16, 12), piel, s * .109, .12, -.005, R.cabeza); o.scale.set(.45, 1, .8);
-      pon(new THREE.TorusGeometry(.016, .004, 6, 16), piel, s * .118, .121, -.003, R.cabeza, false).rotation.y = Math.PI / 2;
-    }
-    // pelo: una capa con mechones (relieve de puntas) y un flequillo
+    pon(cil(.044, .054, .17, 24), piel, 0, .535, .004, R.torso).scale.z = .92;   // cuello
+
+    /* ---- cabeza esculpida: una esfera deformada con cejas, cuencas, pómulos, nariz, labios y mentón ---- */
+    R.cabeza = grupo(0, .585, -.004, R.torso);
+    const HA = .079, HB = .116, HC = .099, CY = .13, CZ = .01;
+    const rostro = (x, y, z, cuencas) => {
+      let d = .035 * g2(x, y - .19, .55, .07);                                                        // arco de las cejas
+      if (cuencas) d -= .075 * (g2(x - .4, y - .02, .17, .11) + g2(x + .4, y - .02, .17, .11));       // cuencas
+      d += .045 * (g2(x - .6, y + .16, .17, .14) + g2(x + .6, y + .16, .17, .14));                      // pómulos
+      const kn = ss(.06, -.34, y), corte = y > -.36 ? 1 : Math.exp(-(((y + .36) / .04) ** 2));
+      d += (.035 + .2 * kn * kn) * ss(.14, .04, y) * corte * Math.exp(-(x * x) / (lerp(.045, .085, kn) ** 2));   // tabique (bajo entre los ojos, sube hacia la punta)
+      d += .06 * g2(x, y + .37, .09, .06) + .05 * (g2(x - .12, y + .41, .06, .05) + g2(x + .12, y + .41, .06, .05));   // punta y aletas
+      d += .05 * g2(x, y + .56, .24, .035) - .04 * g2(x, y + .605, .22, .012) + .055 * g2(x, y + .65, .2, .04) - .02 * (g2(x - .26, y + .6, .05, .05) + g2(x + .26, y + .6, .05, .05));         // labios
+      d -= .02 * g2(x, y + .75, .2, .04); d += .055 * g2(x, y + .88, .22, .08);                          // surco y mentón
+      d -= .03 * (g2(x - .86, y - .3, .15, .2) + g2(x + .86, y - .3, .15, .2));                          // sienes
+      return d * ss(.15, .55, z);
+    };
+    const ptoCabeza = (dx, dy, dz, cuencas = true) => {
+      const d = rostro(dx, dy, dz, cuencas);
+      const plano = dz > 0 ? .13 * ss(.35, 1, dz) * (1 - .6 * ss(-.2, -.9, dy)) : 0;   // cara más plana de frente; el relieve se suma encima
+      let x = dx * (1 + d), y = dy * (1 + d), z = dz * (1 - plano + d);
+      x *= 1 - .3 * ss(-.05, -.95, y);                                    // mandíbula más angosta
+      if (z < 0) z *= 1.08 - .4 * ss(-.3, -.95, y) * ss(0, -.7, z);       // nuca llena que se mete hacia el cuello
+      z += .05 * ss(-.65, -.95, y) * ss(.3, .8, dz);                      // mentón
+      return new THREE.Vector3(x * HA, y * HB, z * HC);
+    };
+    const normalCab = q => new THREE.Vector3(q.x / (HA * HA), q.y / (HB * HB), q.z / (HC * HC)).normalize();
     {
-      const geo = new THREE.SphereGeometry(.127, 64, 32, 0, Math.PI * 2, 0, Math.PI * .6), pos = geo.attributes.position, v = new THREE.Vector3(), n = new THREE.Vector3();
-      for (let i = 0; i < pos.count; i++) {
-        v.fromBufferAttribute(pos, i); n.copy(v).normalize(); const th = Math.atan2(n.x, n.z), ph = Math.acos(n.y);
-        const mech = Math.max(0, Math.sin(th * 9 + ph * 5) * Math.sin(ph * 13 - th * 3)) * .013 + Math.sin(th * 23 + ph * 31) * .0025;
-        v.addScaledVector(n, mech + .003); pos.setXYZ(i, v.x, v.y, v.z);
+      const geo = new THREE.SphereGeometry(1, movil ? 96 : 128, movil ? 72 : 96), p = geo.attributes.position, col = [];
+      const cB = new THREE.Color("#c98d68"), cR = new THREE.Color("#c46c58"), cL = new THREE.Color("#9a5047"), cBa = new THREE.Color("#7b5d4c"), cO = new THREE.Color("#a47262"), c = new THREE.Color();
+      for (let i = 0; i < p.count; i++) {
+        const dx = p.getX(i), dy = p.getY(i), dz = p.getZ(i), q = ptoCabeza(dx, dy, dz); p.setXYZ(i, q.x, q.y, q.z);
+        const fr = ss(.1, .5, dz);
+        c.copy(cB)
+          .lerp(cR, fr * cl(.2 * (g2(dx - .55, dy + .25, .2, .17) + g2(dx + .55, dy + .25, .2, .17)) + .22 * g2(dx, dy + .36, .1, .08)))
+          .lerp(cO, fr * .25 * (g2(dx - .4, dy + .1, .16, .06) + g2(dx + .4, dy + .1, .16, .06)))
+          .lerp(cBa, cl(.32 * ss(-.42, -.62, dy) * (1 - .8 * g2(dx, dy + .62, .25, .07)) * ss(-.4, .2, dz) + .22 * fr * g2(dx, dy + .5, .2, .04)))
+          .lerp(cL, fr * cl(1.6 * (g2(dx, dy + .56, .21, .032) + g2(dx, dy + .65, .19, .038))));
+        col.push(c.r, c.g, c.b);
       }
-      geo.computeVertexNormals();
-      pon(geo, pelo, 0, .146, -.014, R.cabeza).rotation.x = -.45;
-      const mechon = new THREE.SphereGeometry(.03, 14, 10);
-      for (let i = 0; i < 9; i++) {
-        const a = (i - 4) * .26, m = pon(mechon, pelo, Math.sin(a) * .09, .225 - Math.abs(i - 4) * .006, Math.cos(a) * .07, R.cabeza, false);
-        m.scale.set(.75, .38, 1.5); m.rotation.set(-.55 + (i % 2) * .12, a, (i - 4) * .05);
-      }
+      geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3)); geo.computeVertexNormals();
+      pon(geo, pielCara, 0, CY, CZ, R.cabeza);
     }
-    // brazos: hombro, brazo, codo, antebrazo, puño y mano con dedos
-    const dedo = new THREE.CapsuleGeometry(.0085, .03, 4, 10), pulgar = new THREE.CapsuleGeometry(.0095, .024, 4, 10);
+    // ojos: globo, iris con textura y pupila, párpados que se cierran y pestañas
+    const irisTex = textura(lienzo(128, 64, (g, w, h) => {
+      const gr = g.createLinearGradient(0, 0, 0, h);
+      [[0, "#040302"], [.29, "#040302"], [.33, "#3a2210"], [.6, "#6e4624"], [.86, "#4a2c16"], [.93, "#1c110a"], [1, "#1c110a"]].forEach(([k, c]) => gr.addColorStop(k, c));
+      g.fillStyle = gr; g.fillRect(0, 0, w, h);
+      for (let i = 0; i < 170; i++) { g.strokeStyle = `rgba(${Math.random() < .5 ? "20,10,4" : "150,105,58"},${.25 + Math.random() * .3})`; g.lineWidth = .6 + Math.random(); const x = Math.random() * w; g.beginPath(); g.moveTo(x, h * .32); g.lineTo(x + (Math.random() - .5) * 3, h * (.6 + Math.random() * .3)); g.stroke(); }
+    }));
+    const irisM = new THREE.MeshPhysicalMaterial({ map: irisTex, roughness: .35, clearcoat: 1, clearcoatRoughness: .02 });
+    const irisGeo = new THREE.SphereGeometry(.01188, 32, 8, 0, Math.PI * 2, 0, .55);
+    { const uv = irisGeo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setY(i, 1 - (1 - uv.getY(i)) * Math.PI / .55); }
+    R.ojos = [-1, 1].map(s => {
+      const dx = s * .4, dy = .02, q = ptoCabeza(dx, dy, Math.sqrt(1 - dx * dx - dy * dy), false);
+      const o = grupo(q.x, CY + q.y, CZ + q.z - .0125, R.cabeza);
+      pon(new THREE.SphereGeometry(.0118, 24, 18), blanco, 0, 0, 0, o, false);
+      pon(irisGeo, irisM, 0, 0, 0, o, false).rotation.x = Math.PI / 2;
+      const sup = pon(new THREE.SphereGeometry(.0128, 28, 10, 0, Math.PI * 2, 0, Math.PI / 2), piel, 0, 0, 0, o, false);
+      pon(new THREE.TorusGeometry(.0128, .0008, 4, 28, Math.PI), pestana, 0, 0, 0, sup, false).rotation.x = Math.PI / 2;
+      pon(new THREE.SphereGeometry(.0126, 28, 8, 0, Math.PI * 2, Math.PI * .6, Math.PI * .4), piel, 0, 0, 0, o, false);
+      return k => { sup.rotation.x = lerp(1.25, -.5, cl(k)); };
+    });
+    // cejas: pelitos alargados siguiendo el arco, más gruesas por dentro
+    const cejaGeo = new THREE.SphereGeometry(.006, 10, 6).scale(1.35, .38, .32);
+    for (const s of [-1, 1]) for (let k = 0; k < 13; k++) {
+      const u = k / 12, dx = s * lerp(.18, .66, u), dy = .21 + Math.sin(u * Math.PI * .9) * .05 - u * .04, q = ptoCabeza(dx, dy, Math.sqrt(Math.max(.05, 1 - dx * dx - dy * dy)));
+      const c = pon(cejaGeo, peloCeja, q.x, CY + q.y + (Math.random() - .5) * .002, CZ + q.z + .0006, R.cabeza, false);
+      c.scale.set(lerp(1.15, .75, u), lerp(1.3, .6, u), 1); c.rotation.set(-.3, s * (.25 + u * .6), s * (-.12 + u * .45));
+    }
+    // orejas con hélice y lóbulo
+    for (const s of [-1, 1]) {
+      const o = grupo(s * .079, CY - .016, CZ - .008, R.cabeza); o.rotation.y = s * .28;
+      pon(new THREE.SphereGeometry(.03, 20, 14), piel, 0, 0, 0, o).scale.set(.22, 1, .62);
+      pon(new THREE.TorusGeometry(.0165, .0034, 8, 24, Math.PI * 1.5), piel, s * .004, .004, 0, o, false).rotation.set(0, Math.PI / 2, -Math.PI * .25);
+      pon(new THREE.SphereGeometry(.007, 12, 8), piel, s * .002, -.024, .004, o, false).scale.set(.6, 1, .9);
+      pon(new THREE.SphereGeometry(.007, 12, 8), M("#8f5a45", { r: .6 }), s * .0045, .001, .002, o, false).scale.set(.4, 1.2, .9);
+    }
+    // pelo rizado: una base oscura y cientos de rizos pequeños (volumen arriba, degradado corto a los lados)
+    const limitePelo = dz => dz >= 0 ? lerp(.18, .74, Math.pow(dz, 1.4)) : lerp(.18, -.5, Math.pow(-dz, .8));
+    {
+      const geo = new THREE.SphereGeometry(1, 96, 64), p = geo.attributes.position, dentro = [];
+      for (let i = 0; i < p.count; i++) {
+        const dx = p.getX(i), dy = p.getY(i), dz = p.getZ(i); dentro.push(dy > limitePelo(dz) - .02);
+        const q = ptoCabeza(dx, dy, dz); q.addScaledVector(normalCab(q), .0035); p.setXYZ(i, q.x, q.y, q.z);
+      }
+      const ix = geo.index.array, nuevo = [];
+      for (let i = 0; i < ix.length; i += 3) if (dentro[ix[i]] && dentro[ix[i + 1]] && dentro[ix[i + 2]]) nuevo.push(ix[i], ix[i + 1], ix[i + 2]);
+      geo.setIndex(nuevo); geo.computeVertexNormals();
+      pon(geo, peloBase, 0, CY, CZ, R.cabeza);
+      const NR = movil ? 1000 : 2400, rizos = new THREE.InstancedMesh(new THREE.TorusGeometry(.0042, .0031, 6, 10), peloRizo, NR);
+      const m4 = new THREE.Matrix4(), qt = new THREE.Quaternion(), eu = new THREE.Euler(), sc = new THREE.Vector3(), c = new THREE.Color();
+      let n = 0, intentos = 0;
+      while (n < NR && intentos++ < 60000) {
+        const u = Math.random() * 2 - 1, th = Math.random() * Math.PI * 2, rr = Math.sqrt(1 - u * u), dx = rr * Math.cos(th), dy = u, dz = rr * Math.sin(th);
+        const borde = dy - limitePelo(dz); if (borde < 0) continue;
+        const alto = ss(0, .3, borde) * (.55 + .45 * ss(.2, .9, dy));
+        const q = ptoCabeza(dx, dy, dz); q.addScaledVector(normalCab(q), .004 + alto * .014 * (.7 + Math.random() * .6));
+        eu.set(Math.random() * 6.3, Math.random() * 6.3, Math.random() * 6.3); qt.setFromEuler(eu); sc.set(1, 1, 1.4 + Math.random() * .8).multiplyScalar(.55 + alto * .55 + Math.random() * .2);
+        m4.compose(q, qt, sc); rizos.setMatrixAt(n, m4);
+        c.setHSL(.06, .22, .022 + Math.random() * .035); rizos.setColorAt(n, c); n++;
+      }
+      rizos.count = n; rizos.position.set(0, CY, CZ); rizos.castShadow = rizos.receiveShadow = true; R.cabeza.add(rizos);
+    }
+
+    /* ---- brazos: mangas con arrugas en el puño, manos con dedos de dos falanges y uñas ---- */
+    const falange = new THREE.CapsuleGeometry(.0082, .018, 4, 10), unaGeo = RB(.011, .012, .0025, .001, 2);
     const brazo = s => {
       const h = grupo(s * .2, .44, 0, R.torso);
       pon(new THREE.SphereGeometry(.064, 18, 14), sud, 0, 0, 0, h);
-      pon(cil(.06, .051, .28), sud, 0, -.14, 0, h);
+      pon(arrugar(cil(.06, .051, .28, 24, 16), (y, a) => .003 * Math.sin(a * 3 + y * 40) * ss(-.06, -.14, y)), sud, 0, -.14, 0, h);
       const co = grupo(0, -.29, 0, h);
       pon(new THREE.SphereGeometry(.052, 16, 12), sud, 0, 0, 0, co);
-      pon(cil(.051, .043, .2), sud, 0, -.1, 0, co);
-      pon(cil(.041, .044, .045), sud2, 0, -.215, 0, co);                 // puño acanalado
-      pon(cil(.024, .026, .04, 14), piel, 0, -.24, 0, co).scale.z = .7;   // muñeca
-      const mano = grupo(0, -.25, 0, co);
-      pon(RB(.07, .078, .03, .013, 3), piel, 0, -.042, 0, mano);
-      [[-1.5, .032], [-.5, .037], [.5, .035], [1.5, .027]].forEach(([k, l]) => {
-        const d = pon(dedo, piel, k * .0175 * s, -.09 - l * .3, -.006, mano, false); d.scale.y = l / .037; d.rotation.x = .45;
+      pon(arrugar(cil(.051, .043, .2, 24, 20), (y, a) => .0045 * Math.sin(y * 140 + Math.sin(a * 2) * 2) * ss(-.02, -.09, y) + .002 * Math.sin(a * 5 + y * 60)), sud, 0, -.1, 0, co);
+      pon(cil(.041, .044, .045), sud2, 0, -.215, 0, co);
+      pon(cil(.024, .026, .04, 14), piel, 0, -.24, 0, co).scale.z = .7;
+      const mano = grupo(0, -.25, 0, co); R.manos.push({ mano, s });
+      pon(RB(.07, .078, .03, .014, 3), piel, 0, -.042, 0, mano);
+      for (const k of [-1.5, -.5, .5, 1.5]) pon(new THREE.SphereGeometry(.0088, 10, 8), piel, k * .0172 * s, -.078, .004, mano, false);   // nudillos
+      [[-1.5, .9], [-.5, 1], [.5, .96], [1.5, .78]].forEach(([k, l], j) => {
+        const f1 = grupo(k * .0172 * s, -.08, -.002, mano);
+        pon(falange, piel, 0, -.013 * l, 0, f1, false).scale.y = l;
+        const f2 = grupo(0, -.027 * l, 0, f1);
+        pon(falange, piel, 0, -.011 * l, 0, f2, false).scale.set(.94, l * .8, .94);
+        pon(unaGeo, unaM, 0, -.016 * l, .0066, f2, false);
+        R.dedos.push({ f1, f2, fase: j * 1.7 + s * 2.3 });
       });
-      const p = pon(pulgar, piel, -s * .04, -.035, -.01, mano, false); p.rotation.set(.3, 0, -s * .7);
+      const p1 = grupo(-s * .03, -.022, -.006, mano); p1.rotation.set(.35, 0, -s * .75);
+      pon(falange, piel, 0, -.013, 0, p1, false).scale.set(1.12, .95, 1.12);
+      const p2 = grupo(0, -.026, 0, p1); p2.rotation.x = .3;
+      pon(falange, piel, 0, -.01, 0, p2, false).scale.set(1.05, .75, 1.05);
+      pon(unaGeo, unaM, 0, -.014, .0068, p2, false);
       return [h, co];
     };
     [R.hL, R.cL] = brazo(1); [R.hR, R.cR] = brazo(-1);
-    // piernas: jean con rodilla y dobladillo; tenis con suela, puntera y cordones
+    /* ---- piernas: jean con pliegues en la rodilla y tela amontonada en el tobillo ---- */
     const pierna = s => {
       const ca = grupo(s * .085, -.03, 0, R.raiz);
-      pon(cil(.079, .063, .44), pan, 0, -.22, 0, ca);
+      pon(arrugar(cil(.079, .063, .44, 24, 22), (y, a) => .0025 * Math.sin(a * 4 + y * 30) + .004 * Math.sin(y * 90) * ss(-.12, -.22, y) * Math.max(0, Math.cos(a))), pan, 0, -.22, 0, ca);
       const ro = grupo(0, -.44, 0, ca);
       pon(new THREE.SphereGeometry(.062, 16, 12), pan, 0, 0, 0, ro);
-      pon(cil(.06, .052, .4), pan, 0, -.2, 0, ro);
+      pon(arrugar(cil(.06, .052, .4, 24, 22), (y, a) => .005 * Math.sin(y * 110 + a * 2) * ss(-.12, -.2, y) + .0025 * Math.sin(a * 3 - y * 25)), pan, 0, -.2, 0, ro);
       pon(cil(.055, .056, .03), pan2, 0, -.395, 0, ro);
       const to = grupo(0, -.43, 0, ro); (s > 0 ? R.tobillos = [to] : R.tobillos.push(to));
-      pon(RB(.094, .072, .22, .034, 4), zap, 0, -.018, .035, to);                 // capellada
-      pon(new THREE.SphereGeometry(.05, 18, 12), zap, 0, -.035, .135, to).scale.set(.94, .62, 1);   // puntera
-      pon(RB(.106, .032, .272, .013, 3), zap, 0, -.06, .052, to);                 // mediasuela
-      pon(RB(.108, .01, .274, .004, 2), suela, 0, -.079, .052, to);               // suela
-      pon(RB(.05, .035, .07, .015), zapG, 0, .018, .01, to);                      // lengüeta
+      pon(RB(.094, .072, .22, .034, 4), zap, 0, -.018, .035, to);
+      pon(new THREE.SphereGeometry(.05, 18, 12), zap, 0, -.035, .135, to).scale.set(.94, .62, 1);
+      pon(RB(.106, .032, .272, .013, 3), zap, 0, -.06, .052, to);
+      pon(RB(.108, .01, .274, .004, 2), suela, 0, -.079, .052, to);
+      pon(RB(.05, .035, .07, .015), zapG, 0, .018, .01, to);
       for (let k = 0; k < 4; k++) pon(new THREE.BoxGeometry(.05, .005, .007), M("#ffffff", { r: .8 }), 0, .02 - k * .006, .055 + k * .022, to, false).rotation.x = -.25;
       for (const lado of [-1, 1]) { const f = pon(new THREE.BoxGeometry(.003, .016, .11), M(CORAL, { r: .5 }), lado * .0485, -.025, .06, to, false); f.rotation.x = .25; }
       return [ca, ro];
     };
     [R.pL, R.rL] = pierna(1); [R.pR, R.rR] = pierna(-1);
-    R.aud = audifonos(); R.aud.position.set(0, .145, -.005); R.cabeza.add(R.aud);
+    // audífonos a la medida de la cabeza nueva
+    R.aud = grupo(0, .135, -.003, R.cabeza);
+    const audC = audifonos(); audC.scale.set(.8, 1.02, .9); R.aud.add(audC);
   }
   const P0 = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, lean: 0, cab: 0, cabY: 0, shL: 0, shR: 0, ab: .08, elL: -.15, elR: -.15, hipL: 0, hipR: 0, knL: 0, knR: 0, pie: 0, ojos: 1 };
   const pose = o => ({ ...P0, ...o });
@@ -785,7 +876,16 @@ async function iniciar3D() {
     R.raiz.position.set(p.x, p.y, p.z);
     R.raiz.rotation.set(p.pitch, p.yaw, 0);
     R.torso.rotation.x = p.lean;
-    R.cabeza.rotation.set(p.cab, p.cabY, 0);
+    // mirada viva: micro movimientos; al trabajar mira de vez en cuando el monitor vertical
+    const mirarV = t > 7.9 ? (ss(10.6, 11.0, t) - ss(12.0, 12.4, t)) + (ss(14.6, 15.0, t) - ss(15.6, 16.0, t)) + (ss(17.8, 18.1, t) - ss(18.7, 19.0, t)) : 0;
+    R.cabeza.rotation.set(p.cab + Math.sin(t * .7) * .015 * p.ojos, p.cabY + Math.sin(t * .45 + 1) * .03 * p.ojos - mirarV * .4, 0);
+    // respiración (más lenta dormido)
+    const resp = Math.sin(t * (p.ojos < .5 ? 1.25 : 1.8));
+    R.torso.scale.set(1 + resp * .005, 1 + resp * .004, 1 + resp * .012);
+    // dedos: relajados, y tecleando cuando estoy en el PC; la palma mira hacia el cuerpo salvo al teclear
+    const kT = ss(7.5, 8.0, t);
+    for (const d of R.dedos) { const k = t > 7.9 ? Math.max(0, Math.sin(t * 13 + d.fase)) * .35 : 0; d.f1.rotation.x = .3 + k; d.f2.rotation.x = .45 + k * .8; }
+    for (const m of R.manos) m.mano.rotation.y = m.s * 1.3 * (1 - kT);
     let elL = p.elL, elR = p.elR;
     if (t > 7.9) { elL += Math.sin(t * 26) * .04; elR += Math.sin(t * 21 + 1) * .035; }
     R.hL.rotation.set(p.shL, 0, p.ab); R.hR.rotation.set(p.shR, 0, -p.ab);
@@ -794,7 +894,7 @@ async function iniciar3D() {
     R.rL.rotation.x = p.knL; R.rR.rotation.x = p.knR;
     R.tobillos.forEach(o => o.rotation.x = p.pie);
     const parpadeo = p.ojos > .5 && (t * 1000) % 3100 < 110 ? .1 : p.ojos;
-    R.ojos.forEach(o => o.scale.y = Math.max(.08, parpadeo));
+    R.ojos.forEach(f => f(parpadeo));
   }
 
   /* zzz y ondas del despertador */
